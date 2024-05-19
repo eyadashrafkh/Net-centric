@@ -1,0 +1,2420 @@
+Practical Techniques for Searches on Encrypted Data
+Dawn Xiaodong Song David Wagner Adrian Perrig
+
+
+
+dawnsong, daw, perrig  @cs.berkeley.edu
+University of California, Berkeley
+
+1 Introduction
+
+Abstract
+It is desirable to store data on data storage servers such
+as mail servers and file servers in encrypted form to reduce
+security and privacy risks. But this usually implies that one
+has to sacrifice functionality for security. For example, if a
+client wishes to retrieve only documents containing certain
+words, it was not previously known how to let the data storage server perform the search and answer the query without
+loss of data confidentiality.
+In this paper, we describe our cryptographic schemes
+for the problem of searching on encrypted data and provide proofs of security for the resulting crypto systems. Our
+techniques have a number of crucial advantages. They are
+provably secure: they provide provable secrecy for encryption, in the sense that the untrusted server cannot learn
+anything about the plaintext when only given the ciphertext; they provide query isolation for searches, meaning
+that the untrusted server cannot learn anything more about
+the plaintext than the search result; they provide controlled
+searching, so that the untrusted server cannot search for an
+arbitrary word without the user’s authorization; they also
+support hidden queries, so that the user may ask the untrusted server to search for a secret word without revealing
+the word to the server. The algorithms we present are simple, fast (for a document of length , the encryption and
+search algorithms only need
+stream cipher and block
+cipher operations), and introduce almost no space and communication overhead, and hence are practical to use today.
+
+ 
+
+
+
+We gratefully acknowledge support for this research from several US
+government agencies. This research was suported in part by the Defense
+Advanced Research Projects Agency under DARPA contract N6601-9928913 (under supervision of the Space and Naval Warfare Systems Center
+San Diego), by the National Science foundation under grant FD99-79852,
+and by the United States Postal Service under grant USPS 1025 90-98-C3513. Views and conclusions contained in this document are those of the
+authors and do not necessarily represent the official opinion or policies,
+either expressed or implied of the US government or any of its agencies,
+DARPA, NSF, USPS.
+
+Today’s mail servers such as IMAP servers [11], file
+servers and other data storage servers typically must be fully
+trusted—they have access to the data, and hence must be
+trusted not to reveal it without authorization—which introduces undesirable security and privacy risks in applications.
+Previous work shows how to build encrypted file systems
+and secure mail servers, but typically one must sacrifice
+functionality to ensure security. The fundamental problem
+is that moving the computation to the data storage seems
+very difficult when the data is encrypted, and many computation problems over encrypted data previously had no
+practical solutions.
+In this paper, we show how to support searching functionality without any loss of data confidentiality. An example is where a mobile user with limited bandwidth wants
+to retrieve all email containing the word “Urgent” from an
+untrusted mail-storage server in the infrastructure. This is
+trivial to do when the server knows the content of the data,
+but how can we support search queries if we do not wish to
+reveal all our email to the server?
+Our answer is to present cryptographic schemes that enable searching on encrypted data without leaking any information to the untrusted server.
+Our techniques are provably secure. The techniques
+provide provable secrecy for encryption, in the sense
+that the untrusted server cannot learn anything about
+the plaintext given only the ciphertext. The techniques provide controlled searching, so that the untrusted server cannot search for a word without the
+user’s authorization. The techniques support hidden
+queries, so that the user may ask the untrusted server
+to search for a secret word without revealing the word
+to the server. The techniques also support query isolation, meaning that the untrusted server learns nothing
+more than the search result about the plaintext.
+Our schemes are efficient and practical. The algorithms we present are simple and fast. More specifi-
+
+
+  
+
+cally, for a document of length , the encryption and
+search algorithms only need
+number of stream
+cipher and block cipher operations. Our schemes introduce essentially no space and communication overhead. They are also flexible and can be easily extended
+to support more advanced searches.
+Our schemes all take the form of probabilistic searching:
+
+
+a search for the word
+returns all the positions where
+occurs in the plaintext, as well as possibly some other erroneous positions. We may control the number of errors
+by adjusting a parameter  in the encryption algorithm;
+each wrong position will be returned with probability about
+ 
+, so for a -word document, we expect to see about
+
+false matches. The user will be able to eliminate all
+the false matches (by decrypting), so in remote searching
+applications, false matches should not be a problem so long
+as they are not so common that they overwhelm the communication channel between the user and the server.
+This paper is structured as follows. We first introduce
+the problem of searching on encrypted data in Section 2 and
+briefly review some important background in Section 3. We
+then describe our solution for the case of searching with
+sequential scan in Section 4. We discuss further issues such
+as advanced search and search with index in Section 5. We
+discuss related work in Section 6 and finally we conclude in
+Section 7. Appendix A presents the proofs for all of proofs
+of security for these schemes.
+
+2 Searching on Encrypted Data
+We first define the problem of searching on encrypted
+data.
+Assume Alice has a set of documents and stores them
+on an untrusted server Bob. For example, Alice could be a
+mobile user who stores her email messages on an untrusted
+mail server. Because Bob is untrusted, Alice wishes to encrypt her documents and only store the ciphertext on Bob.
+Each document can be divided up into ‘words’. Each ‘word’
+may be any token; it may be a 64-bit block, an English
+word, a sentence, or some other atomic quantity, according
+to the application domain of interest. For simplicity, we typically assume these ‘words’ have the same length (otherwise
+we can either pad the shorter ‘words’ or split longer ‘words’
+to make all the ‘words’ to have equal length, or use some
+simple extensions for variable length ‘words’; see also Section 5.3). Because Alice may have only a low-bandwidth
+network connection to the server Bob, she wishes
+to only
+
+retrieve the documents which contain the word . In order to achieve this goal, we need to design a scheme so that
+after performing certain computations over the ciphertext,
+Bob can determine with some probability whether each doc
+ument contains the word
+without learning anything else.
+
+There seem to be two types of approaches. One possibil
+ity is to build up an index that, for
+each word
+of interest,
+
+lists the documents that contain . An alternative is to perform a sequential scan without an index. The advantage of
+using an index is that it may be faster than the sequential
+scan when the documents are large. The disadvantage of
+using an index is that storing and updating the index can be
+of substantial overhead. So the approach of using an index
+is more suitable for mostly-read-only data.
+We first describe our scheme for searching on encrypted
+data without an index. Since the index-based schemes seem
+to require less sophisticated constructions, we will defer
+discussion of searching with an index until the end of the
+paper (see Section 5.4).
+
+3 Background and Definitions
+Our scheme requires several fundamental primitives
+from classical symmetric-key cryptography. Because we
+will prove our scheme secure, we use only primitives with
+a well-defined notion of security. We will list here the required primitives, as well as reviewing the standard definitions of security for them. The definitions may be skipped
+on first reading for those uninterested in our theoretical
+proofs of security.
+We adopt the standard definitions of security from the
+provable security literature [2], and we measure the strength
+of the cryptographic primitives in terms of the resources
+needed to break them. We will say that an attack -breaks
+a cryptographic primitive if the attack algorithm succeeds
+in breaking the primitive with resources specified by , and
+we say that a crypto primitive is -secure if there is no al
+ 
+
+gorithm that can -break it. Let 
+be an arbitrary algorithm and let  and  be random vari
+ables distributed on 
+. The distinguishing probability
+of —sometimes called the advantage of —for  and 
+is
+('*)
+.'
+Adv  "!$#% & $
+!+#,% - $
+0/
+
+ 
+
+ 
+
+With this background, our list of required primitives is
+as follows:
+1. A pseudorandom generator 1 , i.e., a stream cipher.
+
+6
+We say that 12354
+is a &78:9 -secure pseudorandom generator if every algorithm
+with running time at most 7 has advantage Adv <;=9 . The
+advantage of an adversary is defined as Adv >
+('G)
+.'
+"!+#,% ?1 A@CBED F
+!$#% A@$H I
+ , where
+@CBEDCJ@+H are random variables distributed uniformly
+6
+on 3 4  .
+
+ 
+
+ 
+
+
+
+ 
+
+2. A
+pseudorandom function K . We say that KLM3ONP
+Q SR
+is a -78:TUV9 -secure pseudorandom function
+if every oracle algorithm making at most T oracle
+
+
+
+
+
+queries and with running time at most 7 has advantage
+Adv ; 9 . The advantage
+is defined as Adv <
+
+.'C)
+('
+N 
+"!+#,%
+
+!$#%
+
+ where
+represents
+a random function selected uniformly from the set of
+Q
+R
+all maps from to , and
+ where the probabilities are
+taken over the choice of and .
+3. A pseudorandom permutation  , i.e., a block cipher.
+
+We say that  3 P
+ is a -78:TUV9 -secure pseudorandom function if every oracle algorithm making
+at most T oracle queries and with running time at most
+7 has advantage Adv ;9 . The advantage is defined
+      .' ) !$#,%     (' 
+as Adv > !$#.%
+where  represents a random permutation selected uniformly from the set of all bijections on  , and where
+
+the probabilities are taken over the choice of and  .
+Notice that the adversary is given an oracle for encryption as well as for decryption; this corresponds to the
+adaptive chosen-plaintext/ciphertext attack model.
+
+
+
+
+
+
+
+
+
+In general, the intuition is that -78:TUV9 -security represents
+resistance to attacks that use at most 7 offline work and at
+most T adaptive chosen-text queries.
+There is of course no fundamental need for three separate primitives, since in practice all three may be built out
+of just one off-the-shelf primitive. For instance, given any
+block cipher, we may build a pseudorandom generator using the counter mode [3] or a pseudorandom function using
+the CBC-MAC [4].
+Q  R
+3 P
+We rely on the following notation. If 
+represents a pseudorandom function or permutation, we
+write   for the result of applying  to input  with key
+ 3 . We write E for the concatenation of  and  ,
+and  ! for the bitwise XOR of  and  . For the remain Q#"
+der of the paper, we let 1
+be a pseudorandom
+3 4
+Q 
+generator for some , K
+3 N P
+ be a pseudo
+random function, and 
+3$ P%
+ Q be a pseudoran'& 
+dom permutation. Typically we will have  
+,
+Q
+R
+  
+R
+  
+, and  
+.
+
+P
+ 
+
+ 
+
+4 Our Solution with Sequential Scan
+In this section, we introduce our solution for searching
+with sequential scan. We first start with a basic scheme
+and show that its encryption algorithm provides provable
+secrecy. We then show how we can extend the first scheme
+to handle controlled searching and hidden searches. We describe our final scheme which satisfies all the properties we
+mentioned earlier including query isolation at the end.
+
+4.1 Scheme I: The Basic Scheme
+Alice wants to encrypt a document which contains the
+)(
+
+sequence of words
+,/././  " . Intuitively, the scheme
+
+works by computing the bitwise exclusive or (XOR) of the
+clear-text with a sequence of pseudorandom bits which have
+a special structure. This structure will allow to search on the
+data without revealing anything else about the clear text.
+More specifically, the basic scheme is as follows. Alice
+6 (
+6
+generates a sequence of pseudorandom values
+,/././  "
+using some stream cipher (namely, the pseudorandom gen6+*
+)
+erator 1 ), where each
+is
+ bits long. To encrypt
+ *
+a -bit word
+that appears in position , , Alice takes the
+6 *
+* . 6 * :K 0/ 6 *  , and outputs
+pseudorandom bits , sets  *
+*
+*
+
+2- . Note( that only Alice can genthe ciphertext 1
+erate the pseudorandom stream - ./,/./ 3- " so no one else
+can decrypt. Of course, encryption can be done on-line, so
+that we encrypt each word as it becomes available.
+*
+There is some flexibility in how the keys may be cho
+sen. One possibility is to use the same key at every position in the document. Another alternative is to choose a
+*
+new key for each position independent of all other keys.
+More
+at each position, Alice
+(a) choose
+ * to begenerally,
+4 (5can;either
+,
+the
+same
+as
+some
+previous
+),
+or
+(b)
+ * independently of all the previous keys. We shall seechoose
+later
+how this flexibility allows us to support a variety of interesting features.
+The basic scheme provides provable secrecy if the pseudorandom function K and the pseudorandom generator 1
+are
+By this, we mean that, at each position where
+ * issecure.
+*
+unknown, the values - are indistinguishable from
+truly random bits for any computationally-bounded adversary. We formalize the theorem as below.
+
+
+
+
+
+ 
+
+
+
+
+
+Theorem 4.1. If K is a &78 :9N -secure pseudorandom
+function and 1 is a &78:9 4 -secure pseudorandom generator, and if the key material is chosen as described above,
+then the algorithm described above for generating the se(
+)76
+quence - ././,/M- "  is a -7
+:9 -secure pseudorandom
+)    Q
+generator, where 9 I98"9 N#: 9 4 :
+  and the
+6
+constant is negligible compared to 7 .
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+In other words, we expect the basic scheme to be good
+<; '& >=?A@
+for encrypting up to about max 
+words, if
+the pseudorandom function and pseudorandom generator
+are adequately secure. See Appendix A for a slightly more
+precise statement of the theorem and for a full proof.
+The basic scheme supports searches over the ciphertext
+
+in the following way: if Alice wants to search the word ,
+
+
+*
+she can tell Bob
+and the
+corresponding to each lo
+cation
+where
+a
+word
+may
+occur.
+Bob can then search
+,
+
+*  * is
+for
+in the ciphertext by checking whether 1 
+of the form CB :K 0/ CB  for some B . Such a search can be
+performed in linear time. At the positions where Bob does
+*
+not know , Bob learns nothing about the plaintext. Thus,
+the scheme allows a limited form of control: if Alice only
+wants Bob to be able to search over the first half of the ci * corresponding to
+phertext, Alice should reveal only the
+
+
+
+ 
+
+
+
+
+
+
+Plaintext
+
+
+ 
+
+ 
+
+
+
+
+
+Stream Cipher
+
+
+
+
+
+ Ciphertext
+
+
+
+
+Figure 1. The Basic Scheme
+
+*
+
+those locations and none of the used in the second half of
+the ciphertext.
+As described so far, the basic scheme is not terribly sat
+isfying: if Alice wants to help Bob
+search for a word ,
+
+*
+either Alice must reveal all the (thus potentially revealing the entire document), or Alice must know in advance
+
+which locations
+may appear at (which seems to defeat
+the purpose of remote searching). However, we shall see
+next how to take care of this difficulty.
+
+4.2 Scheme II: Controlled Searching
+  
+
+Let F 3 N P 
+3 N be an additional pseudorandom function, which will be keyed independently of K .
+ *     * .
+The main idea is to choose our keys as
+We require that be chosen uniformly randomly in 3 by
+Alice and never be revealed.
+Then, if Alice wish
+to allow
+
+
+
+Bob to search for the word , she reveals   
+and to
+
+him. This allows Bob to identify all the locations where
+might occur, but reveals absolutely nothing on the locations
+, where  *   . This attains our desired goal of controlled searching. We show the correctness of this approach
+in the following theorem.
+
+ 
+
+ 
+
+
+
+
+
+Theorem 4.2. Suppose K is a &78"V9N -secure pseudorandom function,  is a -78"V9 -secure pseudorandom function, and 1 is a -78:94 -secure pseudorandom generator.
+If the key material is chosen as described above, then
+the algorithm described above for generating the sequence
+- ( ,/././M3- "  will be a &7 ) 6 V9"! -secure pseudorandom
+)    Q
+generator, where 9"! 
+89N : 9 : 94 :
+  .
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+This shows that our scheme for controlled searching is
+about as good as the basic scheme, if the underlying primitives are secure. See Appendix A for a proof as well as a
+more precise formulation.
+Various extensions of this idea are possible. If the document to be encrypted consists of a series of chapters, an
+*
+alternative approach is to generate the key for the word
+
+*
+
+
+
+
+
+
+
+
+
+  # 3C1 
+ . This allows Alin chapter 1 as
+ice to control which chapters Bob may search in as well as
+controlling which words Bob may search for.
+We can take this idea even further by using
+ *  a "hierarchi$ ?01$
+cal key management scheme. Alice sets
+  *
+
+
+
+
+
+
+and %
+. Then she can reveal either
+#
+
+
+(
+(1)     ;'& (*) = ?A1$ for each chapter of interest or (2)
+
+      itself
+if she wishes to succinctly authorize Bob
+
+to search for
+in all the chapters.
+This scheme still does not support hidden search queries:
+in order to let Bob search for the location where the word
+
+
+appears, Alice has to reveal
+to Bob. We shall see next
+that this problem can be easily fixed.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+4.3 Scheme III: Support for Hidden Searches
+Suppose Alice would now like to ask Bob to search for
+
+
+a word
+but she is not willing to reveal
+to Bob. We
+propose a simple extension to the above scheme to support
+this goal.
+
+Alice should merely pre-encrypt each word
+of the
+clear text separately using a deterministic encryption algorithm  #  . Note that  is not allowed to use any randomness, and the computation of  #   may depend only on
+ and must not depend on the position , in the document
+where  is found. So we may think of this pre-encryption
+step as ECB encryption of the words of the document using some block cipher. (Of course, if the word is very
+long, internally the map     may be implemented by CBC *
+encrypting
+with a constant IV, or some such, but the
+point is that this process must be the same at every position
+*     * .
+of the document.) We let 
+After the pre-encryption phase, Alice has a sequence of
+ -encrypted words  ( ,/././   " . Now she post-encrypts
+that sequence using the stream cipher construction de*   *  - * , where  * 
+scribed above to obtain 1
+ *
+*
+6 *
+*
+and - . VK  / - 38/
+# 
+
+
+To search for a word , Alice computes    # 
+
+
+and
+ # & , and sends -   to Bob. Note that this
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Plaintext
+
+ 
+
+
+
+
+Stream Cipher
+
+ 
+
+
+ 
+
+ 
+
+
+
+
+
+
+
+
+
+ Ciphertext
+
+
+
+
+Figure 2. The Scheme for Hidden Search
+
+
+
+
+allows Bob to search for
+without revealing
+itself. It
+is easy to see that this scheme satisfies the hidden search
+property as long as the pre-encryption  is secure.
+
+4.4 Scheme IV: The Final Scheme
+Careful readers may have noticed that Scheme III actually suffers from a small inadequacy: if Alice generates
+ * as  *    C    * then Alice can no longer
+keys
+recover the plaintext from just the ciphertext because she
+ *
+would need to
+know  # 
+(more precisely, the last 
+ *
+bits of    
+) before she can decrypt. This defeats the
+purpose of an encryption scheme, because even legitimate
+principals with access to the decryption keys will be unable
+to decrypt. (Scheme II also has a similar inadequacy, but
+as we will show below, the best way to fix it is to introduce
+pre-encryption as in Scheme III.)
+We now show a simple fix for this problem. In the fixed
+*   #   *
+scheme, we split the pre-encrypted word 
+*
+*
+*
+*
+*
+  V  , where  (respectively )
+into two parts, 
+)
+*
+denotes the first
+(resp. last  bits) of  . Instead
+ *     bits
+*
+ *
+
+C
+
+of generating
+, Alice should generate
+
+*
+*
+6 *
+as
+ #  . To decrypt, Alice can generate
+using
+the pseudorandom generator (since Alice knows the seed),
+6 *
+*
+6+*
+and with
+she can recover  by XORing
+)
+*
+* against the
+first
+ bits of 1 . Finally, knowledge of  allows Alice
+*
+to compute and thus finish the decryption.
+ *
+This fix is not secure if the ’s are not encrypted since it
+might be very likely in some cases that different words have
+)
+the same first
+ bits. Pre-encryption will eliminate
+*
+this problem, since with high probability all the  ’s are
+
+
+
+ 
+
+ 
+ 
+
+ 
+
+
+
+ 
+
+
+
+
+
+  
+
+distinct. (Assuming that the pre-encryption  is a pseudorandom permutation, then due to the birthday paradox [15],
+the probability that at least one collision happens
+( after en)  ; <&  =
+/ )
+crypting words is at most
+With this fix, the resulting scheme is provably secure,
+and in fact we can also show that it provides
+ * query isolation, meaning that even when a single key is revealed, no
+extra information is leaked beyond the ability to identify the
+ *
+positions where the corresponding word
+occurs.
+
+
+
+
+
+
+
+
+
+Theorem 4.3. Suppose  is a &78 :9  -secure pseudorandom permutation, K is a -78"V9 N -secure pseudorandom
+function,  is a &78"V9 -secure pseudorandom function, 1
+is a -78:94 -secure pseudorandom generator, and we choose
+the key material as described above. Then the algorithm de(
+scribed above for generating the sequence - ,/././M3- "  will
+)!6
+:9 ! -secure pseudorandom generator, where
+be a a &7
+)    Q
+9 !  >8,9N : 9 : 94 :
+  .
+ * and consider
+Moreover,
+if
+we
+disclose
+one
+the reduced
+4 values
+
+sequence - obtained
+by
+discarding
+all
+the
+at po 4
+ *
+) 6 
+sitions where
+
+, then we obtain a &7
+:9 ! -secure
+
+ Q
+pseudorandom generator, where 9 ! I9"! : 9  :
+ .
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+Strictly speaking, the proof of the theorem does not actually require  to be a pseudorandom
+permutation: if 
+
+)
+ bits
+denotes the (keyed) map sending
+to the first
+
+of  # 
+, then we can make do with the much weaker
+assumption that collisions in  should be rare. As a special
+)
+ ) can be shown to be
+case, if the first  bits of  ( 
+a pseudorandom function, then  will necessarily have the
+required property, and we will be able to prove a result analogous to Theorem 3. This suggests that for pre-encryption
+
+
+
+ 
+
+
+
+Plaintext
+
+ 
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+Stream Cipher
+
+ 
+
+
+
+
+ 
+
+ Ciphertext
+
+
+
+
+Figure 3. The Final Scheme
+
+ 
+
+of long blocks it may be convenient to take # 
+to be 
+
+
+the bit-reversal of the CBC encryption of
+under key
+(using a constant IV).
+After encrypting word by word, Alice can also re-order
+the ciphertext according to some pseudorandom permutation (known only to Alice). In this case, when Bob performs
+the search of a word, he will not be able to tell the position
+where the word occurs in the real plaintext.
+
+5 Discussion
+5.1 Other Practical Considerations
+We can see that updates in this scheme are easy. For example, if Alice wants to add a new document into Bob’s
+data storage, she can simply encrypt it in the appropriate
+way and instruct Bob to append it to the already-stored ciphertext. Moreover, since the keys can be generated hierarchically from a master key, the key storage and management
+is also very convenient: Alice only needs to remember one
+password, the master key.
+The underlying technique of embedding information in
+pseudorandom bit streams may also be of independent interest: we speculate that this simple trick might prove useful
+for other applications, too.
+
+5.2 Supporting More Advanced Search Queries
+The schemes we presented earlier only address the problem of searching for a single word. We show several ex-
+
+amples to illustrate that it is relatively easy to implement
+more advanced searching functionality using our scheme as
+a fundamental building block.
+It is clear that we can easily support advanced search
+
+ 
+queries which use boolean operators
+(e.g.,
+and
+),
+
+ 
+proximity queries (e.g.,
+near
+), and phrase searches
+
+ 
+(e.g.,
+immediately precedes
+).
+We can also support searches if the query is given as a
+regular expression using, e.g., wildcards in a limited form.
+'
+For example, if Alice wishes to search for the word  %  – ,
+then she can actually generate 26 search queries of the form
+
+    ././,/*  . However, the number of queries required (and the information leaked to the server) clearly
+grows dramatically as the search word becomes more general.
+For many applications the purpose of the search is to find
+documents which contain a specific word, where the position or the number of occurrences are not relevant. For example, searching email is such an application, where the
+query takes on the form “find all email from Joe”. For this
+application, the previous search schemes leaked information, since the server would know the positions of the word
+in the document, or at least the frequency of a word in a document in case the word order is scrambled. Since we only
+need to know whether a given document contains a word,
+we can use the following trick. We add a count to each
+word, which counts how many times that word occurs previously in that document. For example, the first occurrence
+of the word “urgent” is stored as ? urgent , the second oc
+currence as   urgent , etc. This allows Alice to search for
+
+the first occurrence only, if she wishes just to identify the
+documents where the word appears; and Bob does not gain
+any information about other positions of the search term in
+the document. As an additional feature, this encoding allows Alice to search for documents,
+that contain or more
+
+) 
+
+.
+by searching for 
+occurrences of the word
+
+
+
+
+
+5.3 Dealing with Variable-Length Words
+In our scheme, the minimal unit we can search for is an
+individual word. So far we have assumed that the clear text
+can be easily broken into a sequence of words of a fixed
+length. But this might not be true in a normal text document.
+For example, if the minimal unit of search interest is one
+English word, then we have to deal with the fact that English
+words differ in length.
+One possibility is to pick a fixed-size block that is long
+enough to contain most words. Words that are too short
+or too long may be padded to a multiple of the block size
+with some pre-determined padding format. (Note that the
+padding cannot be random since Alice needs to know the
+padding in order to perform the search.) However, such a
+padding scheme would introduce space inefficiency. Also,
+for security reasons we cannot decrease the word length below a certain limit.
+Another solution is to use variable length words. In this
+case, to support random-access decryption, the length of
+each word also needs to be stored with the word. One natural approach is to store the length field before each word in
+the file, and to glue the length field and word together as one
+word to perform encryption and search using our standard
+schemes.
+When words lengths may vary, it is important to hide the
+length information from the server, because revealing the
+length of each word might allow for statistical attacks. Fortunately, in this case the server does not need to know the
+lengths to perform a search: he may just scan through the
+file and check for a match at each possible bit boundary.
+In this case, the cost of each scan is increased, because the
+number of operations is determined by the bit-length of the
+document rather than by the number of blocks in the document. However, such an approach may provide better space
+efficiency than is available with a block-oriented scheme.
+
+5.4 Searching with an Encrypted Index
+Sequential scan may not be efficient enough when the
+data size is large. For some applications, i.e. large
+databases, a common technique to speed up the searching
+is to use a pre-computed index. Here we show how we can
+answer search queries with the aid of an encrypted index
+without sacrificing security.
+
+An index contains a list of key words; with each key
+word is a list of pointers to documents where the key word
+appears. The key words are words of interest that Alice may
+want to search for later. Alice can certainly build the index
+of her clear text documents and then encrypt the clear text
+and the index and store the ciphertext on Bob. The interesting question is how to encrypt the index.
+A naive way would be to just encrypt the key words in
+the index and leave the lists of positions in clear. This makes
+it easy for Bob to perform search queries on Alice’s behalf,
+but also leaks a lot of information to Bob and hence may
+allow him to apply various statistical attacks. Therefore, we
+reject this naive approach.
+A simple way is to also encrypt the document pointers in
+each list in the index. Consequently, when Bob searches for
+  and finds a match, he returns Alice the encrypted list
+of matching positions from the index. Alice may decrypt
+the encrypted entries and send Bob another request to retrieve the relevant documents. One possible advantage for
+this scheme is that the request could be embedded in other
+retrievals so that Bob might have uncertainty about the correlation of the search request and the retrieval request for
+ciphertext. The disadvantage is that Alice has to spend an
+extra round-trip time to retrieve the documents.
+If Alice does not want to wait for an extra round-trip
+time, or if Alice would like Bob to merge the results of several search queries for her, other techniques are also available. For example, she may encrypt the list of document
+
+
+pointers
+index using a key ( related 
+, i.e.
+ (  in#   the
+
+. Hence, when Alice wants to search
+ 
+
+
+for the word , she will reveal 
+8 (  to Bob. In
+order to prevent Bob from doing statistical analysis on the
+index, it is better to keep the lists of pointers in a fixed-size
+list. For words that appear infrequently, Alice can pad the
+list to the fixed size. For more common words, Alice can
+split the long list into several lists with the fixed size; then,
+to search for such a word, Alice will need to ask Bob to
+perform and merge several search queries in parallel. Note
+that by keeping the lists of pointers in a fixed-size list, we
+are mainly preventing Bob from learning statistical information on the key words that he has not searched. For the
+key words that Bob has searched, he might still be able to
+learn some statistical information from Alice’s access pattern. This is acceptable from our point of view since Alice
+only wants to retrieve relevant documents in the first place.
+Note that a general disadvantage for index search is that
+whenever Alice changes her documents, she must update
+the index. There is a trade-off between how much index Alice updates and how much information Bob might be able to
+learn. For example, if Alice does not change the list of document pointers for one key word entry when she adds a new
+document into Bob’s data storage, Bob would be able to
+tell that the key word does not appear in the new document.
+
+ 
+
+  
+
+ 
+
+ 
+
+Hence, Alice needs to update a substantial part of the index
+to hide the real updates which can be quite expensive. It is
+an interesting research question to develop schemes which
+support more efficient updates.
+
+5.5 More Security Issues
+In all our schemes, by allowing Bob to search for a word
+we effectively disclose to him a list of potential locations
+
+where
+might occur. If we allow Bob to search for too
+many words, he may be able to use statistical techniques to
+start learning important information about the documents.
+One possible defense is to decrease  (so that false matches
+are more prevalent and thus Bob’s information about the
+plaintext is ‘noisy’), but we have not analyzed the costeffectiveness of this tradeoff in any detail.
+A better defense is for Alice to periodically change the
+key, re-encrypt all the documents under the new key, and reorder the ciphertext according to some pseudorandom permutation (known to Alice but not to Bob). This will help
+prevent Bob from learning correlations or other statistical
+information over time. This technique may also be helpful if Alice wants to hide from Bob the places where the
+searched word occurs in the documents of interest.
+In all the schemes we have discussed so far, we must
+trust Bob to return all the search results. If Bob holds out on
+us and returns only some (but not all) of the search results,
+Alice will have no way to detect this. In our scope of interest, we assume Bob does not misbehave in this way. Even
+when this type of attack is present, it is possible to combine
+our scheme with hash tree techniques [17] to ensure the integrity of the data and detect such attacks, although a full
+description of this countermeasure is out of the scope of the
+paper.
+
+
+6 Related Work
+Many researchers have investigated the problem of providing secrecy and integrity when using an untrusted file
+server or external untrusted memory [5, 12, 1, 6]. But as far
+as we know, no previous work has provided a solution for
+searching on encrypted data. Secure multi-party computation and oblivious functions are also intensely studied (see,
+e.g., [14, 8]). We believe there could be a solution to the
+problem of searching on encrypted data using multi-party
+computation, but it would require a high overhead, for example multiple servers. Our solution only needs one server
+to search on encrypted data, and hence is a more practical
+solution.
+Several researchers have studied the Private Information
+Retrieval (PIR) problem [9], so that clients may access entries in a distributed table without revealing which entries
+they are interested in. The PIR literature typically aims for
+
+very strong information-theoretic security bounds, which
+makes it harder to find practical schemes: PIR schemes often require multiple non-colluding servers, consume large
+amounts of bandwidth, do not guarantee the confidentiality
+of the data, do not support private keyword searching, and
+do not support controlled searching or query isolation (but
+see, e.g., [16, 13, 10, 7] for important exceptions which allow to remove some—but not all—of those limitations). In
+contrast, although our scheme does not solve the PIR problem, it needs only a single server (with no impractical trust
+assumptions), has low computational complexity, and supports private keyword searching with very strong security
+properties.
+
+7 Conclusion
+We have described new techniques for remote searching
+on encrypted data using an untrusted server and provided
+proofs of security for the resulting crypto systems. Our
+techniques have a number of crucial advantages: they are
+provably secure; they support controlled and hidden search
+and query isolation; they are simple and fast (More specifically, for a document of length , the encryption and search
+algorithms only need
+stream cipher and block cipher
+operations); and they introduce almost no space and communication overhead. Our scheme is also very flexible, and
+it can easily be extended to support more advanced search
+queries. We conclude that this provides a powerful new
+building block for the construction of secure services in the
+untrusted infrastructure.
+
+ 
+
+
+
+Acknowledgments
+We would like to thank Doug Tygar for his valuable suggestions and advice. We would also like to thank John Kubiatowicz for encouraging the work on the problem of searching on encrypted data. We would also like to thank Bob
+Briscoe for his helpful comments on the paper.
+
+References
+[1] Nancy Amato and Michael Loui. Checking linked
+data structures. In Proceedings of the 24th annual International Symposium on Fault-Tolerant Computing,
+1994.
+[2] M. Bellare. Practice-oriented provable-security. In
+Proceedings of First International Workshop on Information Security (ISW 97). Springer-Verlag, 1998. Lecture Notes in Computer Science No. 1396.
+[3] M. Bellare, A. Desai, E. Jokipii, and P. Rogaway. A
+concrete security treatment of symmetric encryption:
+
+Analysis of the des modes of operation. In Proceedings of the 38th Annual Symposium on Foundations of
+Computer Science. IEEE, 1997.
+[4] M. Bellare, J. Kilian, and P. Rogaway. The security
+of the cipher block chaining message authentication
+code. In CRYPTO’94. Springer-Verlag, 1994. Lecture
+Notes in Computer Science No. 839.
+[5] Matt Blaze. A cryptographic file system for unix. In
+Proceeding of the 1st ACM Conference on Communications and Computing Security, 1993.
+[6] M. Blum, W. Evans, P. Gemmell, S. Kannan, and
+M. Noar. Checking the correctness of memories. Algorithmica, 12(2/3), 1994.
+[7] C. Cachin, S. Micali, and M. Stadler. Computationally private information retrieval with polylogarithmic communication. In EUROCRYPT’99. SpringerVerlag, 1999. Lecture Notes in Computer Science No.
+1592.
+[8] R. Canetti. Studies in Secure Multi-Party Computation
+and Applications. PhD thesis, Weizmann Institue of
+Science, Israel, 1995.
+[9] B. Chor, O. Goldreich, E. Kushilevitz, and M. Sudan.
+Private information retrieval. In Proceedings of the
+68th Annual Symposium on Foundations of Computer
+Science. IEEE, 1995.
+[10] Benny Chor, Niv Gilboa, and Moni Naor. Private information retrieval by keywords. Report 98-03, Theory of Cryptography Library, 1998.
+[11] M. Crispin. Internet message access protocol - version
+4. RFC1730, December 1994.
+[12] Premkumar T. Devanbu and Stuart G. Stubblebine.
+Stack and queue integrity on hostile platforms. In Proceeding of IEEE Symposium on Security and Privacy,
+1998.
+[13] Y. Gertner, Y. Ishai, and E. Kushilevitz. Protecting
+data privacy in private information retrieval schemes.
+In Proceedings of the 30th Annual ACM Symposium
+on Theory of Computing. ACM, 1998.
+[14] Oded Goldreich. Secure multi-party computation.
+Working Draft, 1998.
+[15] S. Goldwasser and M. Bellare. Lecture notes on
+cryptography. available online from http://wwwcse.ucsd.edu/users/mihir/papers/gb.html.
+
+[16] E. Kusilevitz and R. Ostrovsky. Replication is not
+needed: single database, computationally-private information retrieval. In Proceedings of the 38th Annual Symposium on Foundations of Computer Science.
+IEEE, 1997.
+[17] Ralph C. Merkle. A certified digital signature. In
+G. Brassard, editor, CRYPTO89, pages 218–238.
+Springer-Verlag, 1990. Lecture Notes in Computer
+Science No. 435.
+
+A Proofs of Security
+Define
+
+ 
+
+
+
+3 N
+
+Q
+
+
+
+P 3 4
+
+R
+
+P
+
+ " by
+
+   4 $. B ( :K  CB ( 8,/././M0B " :K   B " (
+4  Q
+
+where
+write B
+as shorthand for the 5 -th block of
+ 4 we
+1
+. Please refer to Section 3 for notation and precise
+definitions of security for the primitives  :K V1 .
+
+ 
+
+
+
+
+
+Lemma A.1. If K is a &78 :9 N -secure pseudorandom
+function and 1 is a &78V9 4 -secure pseudorandom generator,
+) 6
+then
+(defined as above) is a &7
+:9!  -secure pseudo)    Q
+random generator, where 9 ! F9 N#: 9 4 : &
+ 
+6
+and the constant is negligible compared to 7 .
+
+
+
+
+
+
+
+ 
+
+
+
+(
+
+
+
+ 
+
+ (
+
+
+
+Proof. Define 
+
+ VK   8,/./,/  " :K   " 
+(
+where  ./,/./M " are independent random variables each
+Q
+drawn from the uniform distribution on . Also, let
+@ be a
+Q
+R "
+P
+random variable with
+the
+uniform
+distribution
+on
+.
+
+We will write   8@ for the random variables obtained
+by choosing  4 uniformly at random from 3 N P 3 4 .
+The goal is to show that
+and @ are indistinguishable
+to any computationally-bounded  adversary. The proof will
+proceed by showing first that
+and  are indistinguishable, and second that  and @ are indistinguishable.
+) 6
+First, we show that no algorithm
+with running time 7
+
+can distinguish between
+and  with advantage better
+than 9 4 . Suppose not, i.e., there exists an algorithm with
+) 6
+running time at most 7
+and
+
+ 
+
+
+
+Adv
+
+
+
+"!+#,%
+
+  $  .') !+#,%  + .' 
+
+
+
+
+
+
+
+
+9 4 /
+
+Then we exhibit an algorithm with running time at most 7
+which distinguishes the output of 1 from a truly random bit
+string with advantage at least 9 4 . The algorithm works
+ Q#" , it
+(
+in the following way: on input B   B ,/././ AB " 
+(
+(
+runs on input   B :K  CB 8./,/./M0B " :K  CB "  and
+ 4 halts
+!$#,% ?1
+with the output
+from
+.
+Note
+that
+
+
+('
+('
+('
+.'
+F!$#%  $
+!$#,%  +
+and !$#,% @ $
+,
+
+Q "
+where @ is a uniformly-distributed random variable on .
+Thus we calculate
+
+ 
+
+ 
+
+ 
+ 
+
+ 
+  
+ 
+
+
+
+-1   4   ('* ) ('*) !+#,% A@  .$'  (' 
+"!+#,% 
+ 
+!+#,%   
+
+
+
+
+Adv 
+
+
+
+"!+#,%
+
+Adv
+
+
+
+9 4 
+
+which contradicts our assumption that Adv was large.
+Second, we show that no algorithm with running time
+) 6
+7
+can distinguish between  and @ with advantage better
+)   Q
+  . Suppose not, i.e., there exists
+than 9N :
+an algorithm with
+
+
+Adv
+
+
+
+ 
+
+ !$#,%
+
+ +
+
+.')
+
+
+
+ 
+
+A@ $
+
+!$#%
+
+('
+
+ 
+
+ 
+
+ 
+
+!$#,%
+
+
+
+
+
+
+
+!$#,%
+
+'
+
+'
+
+8
+
+ E .!+#,% E
+
+'
+'
+!+#.%
+
+ E ,!$#% E
+
+'
+'
+'
+!$#% E
+!$#,% @ +
+ E .!+#,% E
+
+'
+'
+!$#,% @ +
+ E .!+#,% E
+
+'
+'
+'
+!+#.% A@ +
+ E ,!$#,% E
+!$#% E
+) 
+('
+/
+!$#,% @ +
+ Q
+ 
+('
+N
+Without loss of generality, we may assume !+#,%
+
+
+.'
+. Thus,
+!$#,%
+
+('*)
+.'
+N
+
+"!+#,%
+
+!+#,%
+
+
+Adv
+.')
+('
+
+ !$#,%  $
+!$#,% @ +
+)
+)    Q
+&
+  
+)
+)    Q
+Adv
+
+   9 N 
+
+:
+
+
+
+
+
+ 
+ 
+ 
+ 
+
+:
+
+
+
+8
+
+8
+8
+
+
+
+: 
+
+ 
+
+
+
+:
+
+8
+
+
+
+:
+
+
+
+
+
+
+
+ 
+
+
+
+
+ 
+
+ 
+
+
+
+which contradicts our assumption that Adv was large.
+Next, we note that the above two results suffice to show
+) 6
+that no algorithm
+with running time 7
+can distinguish
+
+between
+and @ with advantage better than 9 N : 9 4 :
+)    Q
+  . Consider any algorithm that attempts to
+
+distinguish
+from @ ; then
+
+
+
+ 
+
+
+
+
+
+  $  (('')) !$#% A@ + (('' 
+"!$#,% 
+$
+!$#%  +
+: !+#.%     ('*) !+#,% A @ +  .' 
+"!$#,% 
+  (('') ) !$#%  +  ((' ' 
+$
+: "!$#,%  +  )  !$#% A @ +  
+ Q 
+9 4 : 9 N :
+ !$#.%
+
+Adv
+
+
+
+
+
+
+
+
+
+
+keyed version of the construction
+
+ ( analyzed
+ in
+Lemma A.1. In other words, the key   ./,/./M "  is a
+vector of independent random variables that are uniformly
+distributed on 35N .
+
+
+
+
+
+
+
+
+
+
+
+Lemma A.2. If K is a &78 :9N -secure pseudorandom
+function and 1 is a &78:94 -secure pseudorandom genera(defined as above, with independent keys) is a
+tor, then
+) 6
+&7
+:9 ! -secure pseudorandom generator, where 9 ! 
+8,9N : 94 and the constant 6 is negligible compared to 7 .
+
+
+
+
+
+
+
+
+
+Proof. The outline of the proof is as in Lemma A.1, except
+the second part (the treatment of the indistinguishability of
+* ( ,
+ and @ ) must be modified slightly. We define 
+) by
+
+
+
+( VK   ( 8,/./,/  * VK  /  4 (
+ 
+* (   *  ( ,/././  "   " 
+ 
+* ( *
+where the     +@ ./,/./   " are independent, uniformlyR
+*
+
+
+* 
+
+
+
+distributed randomQ variables on and the  are as above
+(i.e., uniform on
+and independent of everything else).
+Note, for example, that  2@ and  "   . Now
+we show that each pair of neighbors in the sequence
+( ./,/./   " are -7 ) 6 :9 N -indistinguishable.
+   
+Suppose not, i.e., there exists some , and some al* from  * & ( with advantage
+gorithm
+distinguishing 
+Adv
+
+9 N . Then we construct an oracle algorithm
+that distinguishes K from a truly
+ random
+ ( ./,function,
+ * ( as
+(
+Q
+follows:
+chooses  ./,/./   "
+,
+/./M &
+ R independently and uni* (
+3 N , and   ./,/./   "
+formly at random;
+uses its own key material to com(
+* ( uses its oracle  to compute
+pute K   8,/./,/ :K 0/   &
+*
+  ; then runs on the string
+
+
+
+ 
+
+
+
+ 
+
+
+
+
+
+( :K   ( 8,/././  * & ( :K  & (  * & ( 8
+ 
+*
+* * (   *  ( ././,/  "   " 
+ A  ( 
+
+
+
+ 
+
+and finally halts with  as its output. By the definition
+('
+* (' . Also, we
+N 
+of , we have !$#% 
+
+ !+#,%  5
+(  (' , since the
+('
+*
+see easily that !$#%
+
+ !$#,%  &
+output of a random function that is invoked only once is
+uniform and independent of everything else in sight. Therefore, we find that
+
+
+
+ 
+
+
+
+
+
+  (') !$#%   (' 
+* (') !$#%   * & ( $
+"!+#,%   $
+
+
+
+Adv 
+
+
+
+
+
+;
+
+Next define
+
+) 
+&
+ / where B 4 is defined as before. This is an independently9N :
+ Q
+
+ 
+
+ 
+
+ 
+
+('
+
+&3 N  " P 3 4   Q P R  " by
+    4 $ CB ( :K  C B ( 8,/././M0B " :K   CB " 38
+
+
+
+Then we construct an oracle algorithm
+which distinguishes K ( from a truly random function, as follows:
+chooses  ././,/  " uniformly and independently at random, queries its oracle  a total of times with the in*
+*
+puts  to receive the outputs   , runs on the string
+(
+(
+  0  8,/./,/M " A  "  , and halts with  as its
+output. We want to show that Adv is large. Of course,
+.'
+.'
+N 
+!$#,%
+
+ !$#(% '   , so it remains only to characterize !$#%
+, where is a truly random function
+
+Q  R
+.
+selected uniformly from the set of all maps
+(
+Let E denote the event that the values  ./,/./M  " are all
+distinct. Also, write E for the complementary event, i.e.,
+
+,+;)5
+the case4 where there exist ,J 5 with
+such that
+*   . Now we may compute
+
+
+
+where the final line follows by applying the previous two
+parts of the proof.
+
+
+
+"!$#%
+
+Adv
+
+N
+
+9 N 
+
+.'
+
+
+which contradicts our assumption that Adv was large.
+Now a simple application of the triangle inequality suf) 6
+" 8-9 N -distinguish
+fices to show that no algorithm can -7
+ " 
+
+from    @ : if is any such algorithm, then
+
+
+
+Adv
+
+
+
+ " + .') !$#,%   $ ('
+* ('*) !+#,%  * & ( $ (' 
+( *   !$#,%  $ 
+
+
+"!$#%
+
+
+
+
+
+
+
+"
+
+
+
+89 N /
+;
+
+This suffices to complete the proof, since the rest of the
+proof of Lemma A.1 now carries through.
+We are, at last, ready to consider the construction
+*
+above where now the keys are not necessarily chosen independently, but instead are chosen according to some disQ
+R "
+tribution  on
+. We require  to have the followP
+ing property:
+
+
+
+
+
+Definition 1. We say that a distribution  on the keys
+ ( ././,/M  " has the twining property if, for all 5 , either (a)
+, ;.5 such that !+# %  4   * '   , or (b) 
+there exists
+
+4
+selects
+at random from 3 N , independently of
+ ( ././,/M  4 uniformly
+& (.
+
+
+
+
+
+Theorem A.3. If K is a -78"V9N -secure pseudorandom
+function and 1 is a  -78: 94 -secure pseudorandom gener
+-35N
+ator, and if the key
+is chosen according to
+a distribution  with the twining property, then
+is a
+) 6
+&7
+V9 ! -secure pseudorandom generator, where 9 ! 
+8J9 N2: 9 42: & )     Q  and the constant 6 is negligible compared to 7 .
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+( VK   ( (././,/  4  & ( VK   4  & ( (
+ 
+
+4    4  ./,/./M "   " 
+
+
+where we define 5   , :  . We can see (using the arguments presented in the first part of the proof of Lemma A.1)
+) 6
+that     is &7
+V9 4  -indistinguishable from .
+*   +
+
+)
+
+Then we construct an oracle algorithm that distinguishes
+K from a truly random function, as follows:
+
+( ./,/./M "  Q ,  ( ././,/  * & (  3 N , and  4 :./,/.chooses
+
+/   "
+R
+independently and uniformly at random; uses
+4 its( own
+(
+key material to compute K  C4 B (./,/.4 / VK    CB & 4 and
+(
+(
+uses its oracle  to compute  CB 80 CB  8./,/./ 0 CB  & ;
+then runs on the string
+
+ 
+  
+
+*
+!$#%    
+
+
+
+
+
+To obtain the desired result, we next show that each pair
+
+
+
+
+
+
+
+  as its output. We have !$#,% N  
+
+and finally halts with
+('
+
+
+
+
+
+3 ( :K   ( 8,/./,/M 4 & ( :K 4 & (  4 & ( 8
+4 0  4 8./,/./   4  & ( A  4  & ( 38
+ 
+ 4 "  4 :./,/./   "   " 
+
+
+
+
+
+.'
+
+. Also, using the argument in the second part of the proof of Lemma A.1, we obtain the bound
+
+
+
+ * & ( + (' : * & * )       Q  8
+) * *V)
+from which we may conclude that Adv
+Adv
+&
+   Q
+     9 N , and this contradicts our assumption that
+!+#,%
+
+.'
+
+
+
+!+#,%
+
+
+
+
+
+
+
+Adv was large.
+Finally, using the triangle inequality, and noting that
+
+*  *M)  
+
+(  * 
+
+
+
+Proof. First observe that we may, without loss of generality, reorder
+so that, for  all
+4 5 , either
+ 4  the
+ 4 & ( keys
+'
+
+(a) !$#  %
+, or (b) 4 is selected
+
+ ( ././,/M  & ( . Thus,
+uniformly and independently of
+ 
+we obtain  a 
+sequence
+of keys
+of the
+form
+
+
+
+
+
+
+
+
+(
+(
+/./,/  @ (./,/./   ,/././M   where the
+  (   .@ /../,/,/M/./   (   are@ .all
+*
+independent.
+Let denote the num
+
+
+*
+ber of times that key
+is repeated in , and let  be a
+function
+which
+associates
+to each , the first 5 such that
+ 4   * '   .
+!$# %
+Now we simply combine the techniques used in the
+proofs of Lemma A.1 and Lemma A.2. We use a hybrid
+*
+argument as in Lemma A.2, this time defining  by
+
+
+* & (   * in the sequence    ( ,/././   is
+6
+*
+&7 V9 N : & *M)       Q    -indistinguishable.
+Suppose not, i.e., there exists some , and some algorithm
+*
+* (
+distinguishing  from  & with advantage
+Adv 
+*
+E)I   Q
+*
+9 N :
+&
+     . Let 5   ,  and 5    , :   .
+
+of neighbors 
+
+  )Q   
+
+ Q
+ 
+
+
+
+
+
+we obtain the desired result.
+Next, we consider the security of
+when the key material is chosen using a pseudorandom function  3ON P
+  
+
+of using truly random bits. We will
+ 3 N 3 instead
+N to be chosen uniformly at random, inderequire
+pendent of everything else.
+
+
+
+
+
+Theorem A.4. Suppose K is a &78"V9 N -secure pseudorandom function,  is a &78"V9 -secure pseudorandom function, and 1 is a -78:9 4 -secure pseudorandom generator.
+ * as  * 
+Suppose moreover that we choose the keys
+ *
+)!6
+. Then will be a &7
+
+V9"! -secure pseudoran)
+dom generator,
+where
+9! 
+9 N : 9 : 9 4 :
+8
+   Q
+  .
+
+
+
+ 
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Proof. We will show that the resulting distribution  on the
+keys has an ‘approximate twining property’, in the sense
+that  is computationally indistinguishable from a distribution with the twining property. In particular,
+ *  the latter
+ *
+distribution is given by the random variables
+,
+where is a truly random function selected uniformly from
+  
+the set of all maps from 
+to 3 N .
+
+ 
+
+A straightforward simulation argument
+that the
+   4 and     4 shows
+) 6
+random variables
+are -7
+V9 indistinguishable. Suppose not, so that there exists an algorithm
+that distinguishes those two random variables
+) 6
+with running time at most 7
+and advantage Adv 
+9" . Then we show that we can construct an adversary
+which &78 :9 -breaks  .  The oracle algorithm
+works
+as follows:
+picks 4
+3 4 uniformly at random;
+*   * using its oracle and computes
+computes
+(
+CB ( ,/././M0B "(  =1  4 ; then runs on the string 
+CB VK B 8,/./,/ AB " VK  CB " 3  and.' finally halts with
+   4 + 
+as its output.  We have !$#,%
+
+
+$
+!
+,
+#
+%
+    4  (' . Thus
+('
+.'
+and !$#%
+
+ !+#,%
+Adv  Adv  9 , which contradicts our assumption
+that Adv is large.
+  has the twining property, so by
+Finally, we note that
+    4 and @ are
+Theorem A.3, the random variablesQ
+) 6
+)   
+&7
+ $8 9N : 94 :
+  -indistinguishable.
+Applying the triangle inequality completes the proof.
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+  
+  
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+ 
+
+
+
+
+ 
+
+
+
+ 
+
+
+
+A final goal is to show that the scheme of Section 4.4 is
+*
+secure even after we reveal one key so Q that a server
+may
+R  Q
+P
+perform a search on our behalf. Let
+be a
+ 3'   .
+projection onto the first component, so that
+
+
+
+  
+
+
+
+
+Theorem A.5. Suppose  is a -78":9 -secure pseudorandom permutation, K is a -78":9 N -secure pseudorandom
+function,  is a -78":9 -secure pseudorandom function, 1
+is a &78V94  -secure
+generator, and we choose
+*  *  pseudorandom
+)  6  * where  * 
+     * .
+the keys as
+:9 ! -secure pseudorandom generThen will be a -7
+)    Q
+  .
+ator, where 9 !  >8,9N : 9 :  94 :
+*
+Moreover, if we disclose one and consider the projection
+of where we discard all outputs
+at positions 5 where
+ 4
+ *
+))6 
+
+, then we obtain
+a
+&7
+:9 ! -secure pseudoran
+ Q
+dom generator, where 9 ! F9"! : 9  :
+ .
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+ 
+
+ 
+  
+
+
+
+Proof. The techniques used in the proof of Theorem A.4
+ *
+*
+apply directly (replacing the
+’s with  ’s), and one may
+)76
+readily see that
+is a -7
+V9"! -secure pseudorandom
+generator.
+ * . Let E denote the event that
+Now, suppose we disclose
+4
+ 4   *
+*
+there exists some 5 with
+but    . We may
+
+
+'
+ Q
+9  :
+  . Let  be the distribution
+observe that !+#,% E
+ modified by projecting away all keys at positions 5 where
+
+ 4
+ *
+
+. Note that  represents the distribution of key
+material for the projected version of . Also,
+when condi
+tioned on the event E, the distribution  has the ‘approximate twining property’ used in the proof of Theorem A.4,
+and thus those results apply to the projected version of .
+The desired result follows.
+
+
+
+
+
+

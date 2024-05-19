@@ -1,0 +1,1411 @@
+Attribute-Based Encryption for
+Fine-Grained Access Control of Encrypted Data
+Vipul Goyal∗
+
+Omkant Pandey†
+
+UCLA
+
+UCLA
+
+vipul@cs.ucla.edu
+
+omkant@cs.ucla.edu
+
+Amit Sahai‡
+
+Brent Waters§
+
+UCLA
+
+SRI International
+
+sahai@cs.ucla.edu
+
+bwaters@csl.sri.com
+
+ABSTRACT
+
+Keywords: Attribute-based encryption, access control, audit logs, broadcast encryption, delegation, hierarchical identitybased encryption.
+
+As more sensitive data is shared and stored by third-party
+sites on the Internet, there will be a need to encrypt data
+stored at these sites. One drawback of encrypting data, is
+that it can be selectively shared only at a coarse-grained level
+(i.e., giving another party your private key). We develop a
+new cryptosystem for ﬁne-grained sharing of encrypted data
+that we call Key-Policy Attribute-Based Encryption (KPABE). In our cryptosystem, ciphertexts are labeled with
+sets of attributes and private keys are associated with access structures that control which ciphertexts a user is able
+to decrypt. We demonstrate the applicability of our construction to sharing of audit-log information and broadcast
+encryption. Our construction supports delegation of private
+keys which subsumes Hierarchical Identity-Based Encryption (HIBE).
+
+1. INTRODUCTION
+There is a trend for sensitive user data to be stored by
+third parties on the Internet. For example, personal email,
+data, and personal preferences are stored on web portal sites
+such as Google and Yahoo. The attack correlation center,
+dshield.org, presents aggregated views of attacks on the
+Internet, but stores intrusion reports individually submitted by users. Given the variety, amount, and importance of
+information stored at these sites, there is cause for concern
+that personal data will be compromised. This worry is escalated by the surge in recent attacks and legal pressure faced
+by such services.
+One method for alleviating some of these problems is to
+store data in encrypted form. Thus, if the storage is compromised the amount of information loss will be limited. One
+disadvantage of encrypting data is that it severely limits the
+ability of users to selectively share their encrypted data at a
+ﬁne-grained level. Suppose a particular user wants to grant
+decryption access to a party to all of its Internet traﬃc logs
+for all entries on a particular range of dates that had a source
+IP address from a particular subnet. The user either needs
+to act as an intermediary and decrypt all relevant entries
+for the party or must give the party its private decryption
+key, and thus let it have access to all entries. Neither one of
+these options is particularly appealing. An important setting where these issues give rise to serious problems is audit
+logs (discussed in more detail in Section 7).
+Sahai and Waters [32] made some initial steps to solving
+this problem by introducing the concept of Attributed-Based
+Encryption (ABE). In an ABE system, a user’s keys and ciphertexts are labeled with sets of descriptive attributes and
+a particular key can decrypt a particular ciphertext only if
+there is a match between the attributes of the ciphertext and
+the user’s key. The cryptosystem of Sahai and Waters allowed for decryption when at least k attributes overlapped
+between a ciphertext and a private key. While this primitive was shown to be useful for error-tolerant encryption
+with biometrics, the lack of expressibility seems to limit its
+applicability to larger systems.
+Our Contribution. We develop a much richer type of
+attribute-based encryption cryptosystem and demonstrate
+
+Categories and Subject Descriptors: E.3 [Data Encryption]: Public key cryptosystems.
+General Terms: Security.
+∗
+This research was supported in part by NSF
+ITR/Cybertrust grants 0456717 and 0627781.
+†
+This research was supported in part by NSF
+ITR/Cybertrust grants 0456717 and 0627781.
+‡
+This research was supported in part by an Alfred P. Sloan
+Foundation Research Fellowship, an Intel equipment grant,
+and NSF ITR/Cybertrust grants 0205594, 0456717 and
+0627781.
+§
+This research was supported in part by NSF, the US Army
+Research Oﬃce Grant No. W911NF-06-1-0316, and the Department of Homeland Security (DHS) and the Department
+of Interior (DOI) under Contract No. NBCHF040146. Any
+opinions, ﬁnding and conclusions or recommendations expressed in this material are those of the author(s) and do
+not necessarily reﬂect the views of the funding agencies.
+
+Permission to make digital or hard copies of all or part of this work for
+personal or classroom use is granted without fee provided that copies are
+not made or distributed for profit or commercial advantage and that copies
+bear this notice and the full citation on the first page. To copy otherwise, to
+republish, to post on servers or to redistribute to lists, requires prior specific
+permission and/or a fee.
+CCS’06, October 30–November 3, 2006, Alexandria, Virginia, USA.
+Copyright 2006 ACM 1-59593-518-5/06/0010 ...$5.00.
+
+89
+
+2. RELATED WORK
+
+its applications. In our system each ciphertext is labeled by
+the encryptor with a set of descriptive attributes. Each private key is associated with an access structure that speciﬁes
+which type of ciphertexts the key can decrypt. We call such
+a scheme a Key-Policy Attribute-Based Encryption (KPABE), since the access structure is speciﬁed in the private
+key, while the ciphertexts are simply labeled with a set of
+descriptive attributes. 1
+We note that this setting is reminiscent of secret sharing
+schemes (see, e.g., [3]). Using known techniques one can
+build a secret-sharing scheme that speciﬁes that a set of
+parties must cooperate in order to reconstruct a secret. For
+example, one can specify a tree access structure where the
+interior nodes consist of AND and OR gates and the leaves
+consist of diﬀerent parties. Any set of parties that satisfy
+the tree can reconstruct the secret.
+In our construction each user’s key is associated with a
+tree-access structure where the leaves are associated with
+attributes. 2 A user is able to decrypt a ciphertext if the attributes associated with a ciphertext satisfy the key’s access
+structure. The primary diﬀerence between our setting and
+secret-sharing schemes is that while secret-sharing schemes
+allow for cooperation between diﬀerent parties, in our setting, this is expressly forbidden. For instance, if Alice has
+the key associated with the access structure “X AND Y”,
+and Bob has the key associated with the access structure “Y
+AND Z”, we would not want them to be able to decrypt
+a ciphertext whose only attribute is Y by colluding. To
+do this, we adapt and generalize the techniques introduced
+by [32] to deal with more complex settings. We will show
+that this cryptosystem gives us a powerful tool for encryption with ﬁne-grained access control for applications such as
+sharing audit log information.
+In addition, we provide a delegation mechanism for our
+construction. Roughly, this allows any user that has a key
+for access structure X to derive a key for access structure Y,
+if and only if Y is more restrictive than X. Somewhat surprisingly, we observe that our construction with the delegation
+property subsumes Hierarchical Identity-Based Encryption
+[24, 20] and its derivatives [1].
+
+Fine-grained Access Control. Fine-grained access control systems facilitate granting diﬀerential access rights to
+a set of users and allow ﬂexibility in specifying the access
+rights of individual users. Several techniques are known for
+implementing ﬁne grained access control.
+Common to the existing techniques (see, e.g., [26, 19, 36,
+27, 23, 28] and the references therein) is the fact that they
+employ a trusted server that stores the data in clear. Access control relies on software checks to ensure that a user
+can access a piece of data only if he is authorized to do so.
+This situation is not particularly appealing from a security
+standpoint. In the event of server compromise, for example,
+as a result of a software vulnerability exploit, the potential for information theft is immense. Furthermore, there is
+always a danger of “insider attacks” wherein a person having access to the server steals and leaks the information,
+for example, for economic gains. Some techniques (see, e.g.,
+[2]) create user hierarchies and require the users to share a
+common secret key if they are in a common set in the hierarchy. The data is then classiﬁed according to the hierarchy
+and encrypted under the public key of the set it is meant
+for. Clearly, such methods have several limitations. If a
+third party must access the data for a set, a user of that
+set either needs to act as an intermediary and decrypt all
+relevant entries for the party or must give the party its private decryption key, and thus let it have access to all entries.
+In many cases, by using the user hierarchies it is not even
+possible to realize an access control equivalent to monotone
+access trees.
+In this paper, we introduce new techniques to implement
+ﬁne grained access control. In our techniques, the data is
+stored on the server in an encrypted form while diﬀerent
+users are still allowed to decrypt diﬀerent pieces of data per
+the security policy. This eﬀectively eliminates the need to
+rely on the storage server for preventing unauthorized data
+access.
+Secret-Sharing Schemes. Secret-sharing schemes (SSS)
+are used to divide a secret among a number of parties. The
+information given to a party is called the share (of the secret)
+for that party. Every SSS realizes some access structure that
+deﬁnes the sets of parties who should be able to reconstruct
+the secret by using their shares.
+Shamir [33] and Blakley [6] were the ﬁrst to propose a construction for secret-sharing schemes where the access structure is a threshold gate. That is, if any t or more parties
+come together, they can reconstruct the secret by using their
+shares; however, any lesser number of parties do not get any
+information about the secret. Benaloh [5] extended Shamir’s
+idea to realize any access structure that can be represented
+as a tree consisting of threshold gates. Other notable secretsharing schemes are [25, 14].
+In SSS, one can specify a tree-access structure where the
+interior nodes consist of AND and OR gates and the leaves
+consist of diﬀerent parties. Any set of parties that satisfy the
+tree can come together and reconstruct the secret. Therefore
+in SSS, collusion among diﬀerent users (or parties) is not
+only allowed but required.
+In our construction each user’s key is associated with a
+tree-access structure where the leaves are associated with
+attributes. A user is able to decrypt a ciphertext if the attributes associated with a ciphertext satisfy the key’s access
+
+1.1 Organization
+We begin with a discussion of related work in Section 2.
+Next, we give necessary background information and our
+deﬁnitions of security in Section 3. We then present our ﬁrst
+construction and a proof of security in Section 4. We give
+a construction for the large universe case in Section 5. We
+then show how to add the delegation property in Section 6.
+We follow with a discussion of how our system applies to
+audit logs in Section 7. We discuss the application of our
+construction to broadcast encryption in Section 8. Finally,
+we discuss some interesting extensions and open problems
+in Section 9.
+1
+This contrasts with what we call Ciphertext-Policy
+Attribute-Based Encryption (CP-ABE), where an access
+structure (i.e. policy) would be associated to each ciphertext, while a user’s private key would be associated with a
+set of attributes. KP-ABE and CP-ABE systems are useful
+in diﬀerent contexts.
+2
+In fact, we can extend our scheme to work for any access
+structure for which a Linear Secret Sharing Scheme exists
+(see full version of this paper for details [21]).
+
+90
+
+techniques by having the not of an attribute as a separate
+attribute altogether. Thus, the number of attributes in the
+system will be doubled. From now on, unless stated otherwise, by an access structure we mean a monotone access
+structure.
+An (Key-Policy) Attribute Based Encryption scheme consists of four algorithms.
+
+structure. In our scheme, contrary to SSS, users should be
+unable to collude in any meaningful way.
+Identity-Based Encryption and Extensions. The concept of Attribute-Based Encryption was introduced by Sahai
+and Waters [32], who also presented a particular scheme that
+they called Fuzzy Identity-Based Encryption (FIBE). The
+Fuzzy-IBE scheme builds upon several ideas from IdentityBased Encryption [9, 34, 17]. In FIBE, an identity is viewed
+as a set of attributes. FIBE allows for a private key for an
+identity, ω, to decrypt to a ciphertext encrypted with an
+identity, ω  , if and only if the identities ω and ω  are close to
+each other as measured by the “set overlap” distance metric. In other words, if the message is encrypted with a set of
+attributes ω  , a private key for a set of attributes ω enables
+decrypting that message, if and only if |ω ∩ ω  | ≥ d, where
+d is ﬁxed during the setup time. Thus, FIBE achieves error
+tolerance making it suitable for use with biometric identities. However, it has limited applicability to access control
+of data, our primary motivation for this work. Since the
+main goal in FIBE is error tolerance, the only access structure supported is a threshold gate whose threshold is ﬁxed
+at the setup time.
+We develop a much richer type of attribute-based encryption. The private keys of diﬀerent users might be associated
+with diﬀerent access structures. Our constructions support
+a wide variety of access structures (indeed, in its most general form, every LSSS realizable access structure), including
+a tree of threshold gates.
+Yao et. al. [18] show how an IBE system that encrypts to
+multiple hierarchical identities in a collusion-resistant manner implies a forward secure Hierarchical IBE scheme. They
+also note how their techniques for resisting collusion attacks
+are useful in attribute-based encryption. However, the cost
+of their scheme in terms of computation, private key size,
+and ciphertext size increases exponentially with the number
+of attributes. We also note that there has been other work
+that applied IBE techniques to access control, but did not
+address our central concern of resisting attacks from colluding users [35, 13].
+
+3.
+
+Setup This is a randomized algorithm that takes no input
+other than the implicit security parameter. It outputs the
+public parameters PK and a master key MK.
+Encryption This is a randomized algorithm that takes as
+input a message m, a set of attributes γ, and the public
+parameters PK. It outputs the ciphertext E.
+Key Generation This is a randomized algorithm that
+takes as input – an access structure A, the master key MK
+and the public parameters PK. It outputs a decryption key
+D.
+Decryption This algorithm takes as input – the ciphertext
+E that was encrypted under the set γ of attributes, the
+decryption key D for access control structure A and the
+public parameters PK. It outputs the message M if γ ∈ A.
+We now discuss the security of an ABE scheme. We deﬁne
+a selective-set model for proving the security of the attribute
+based under chosen plaintext attack. This model can be
+seen as analogous to the selective-ID model [15, 16, 7] used
+in identity-based encryption (IBE) schemes [34, 9, 17].
+Selective-Set Model for ABE
+Init The adversary declares the set of attributes, γ, that
+he wishes to be challenged upon.
+Setup The challenger runs the Setup algorithm of ABE
+and gives the public parameters to the adversary.
+Phase 1
+The adversary is allowed to issue queries for
+private keys for many access structures Aj , where γ ∈
+/ Aj
+for all j.
+Challenge The adversary submits two equal length messages M0 and M1 . The challenger ﬂips a random coin b,
+and encrypts Mb with γ. The ciphertext is passed to the
+adversary.
+Phase 2 Phase 1 is repeated.
+Guess The adversary outputs a guess b of b.
+The advantage of an adversary A in this game is deﬁned
+as Pr[b = b] − 12 .
+We note that the model can easily be extended to handle
+chosen-ciphertext attacks by allowing for decryption queries
+in Phase 1 and Phase 2.
+
+BACKGROUND
+
+We ﬁrst give formal deﬁnitions for the security of KeyPolicy Attribute Based Encryption (KP-ABE). Then we give
+background information on bilinear maps and our cryptographic assumption.
+
+3.1 Definitions
+
+Definition 2. An attribute-based encryption scheme is
+secure in the Selective-Set model of security if all polynomial
+time adversaries have at most a negligible advantage in the
+Selective-Set game.
+
+Definition 1 (Access Structure [3]). Let following
+be a set of parties: {P1 , . . . , Pn }. A collection A ⊆ 2{P1 ,...,Pn }
+is monotone if ∀B, C : if B ∈ A and B ⊆ C then C ∈ A.
+An access structure (resp., monotone access structure) is a
+collection (resp., monotone collection) A of non-empty subsets of {P1 , . . . , Pn }, i.e., A ⊆ 2{P1 ,...,Pn } \{∅}. The sets in
+A are called the authorized sets, and the sets not in A are
+called the unauthorized sets.
+
+3.2 Bilinear Maps
+We present a few facts related to groups with eﬃciently
+computable bilinear maps.
+Let G1 and G2 be two multiplicative cyclic groups of prime
+order p. Let g be a generator of G1 and e be a bilinear map,
+e : G1 × G1 → G2 . The bilinear map e has the following
+properties:
+
+In our context, the role of the parties is taken by the
+attributes. Thus, the access structure A will contain the
+authorized sets of attributes. We restrict our attention to
+monotone access structures. However, it is also possible
+to (ineﬃciently) realize general access structures using our
+
+1. Bilinearity: for all u, v ∈ G1 and a, b ∈ Zp , we have
+e(ua , v b ) = e(u, v)ab
+2. Non-degeneracy: e(g, g) = 1.
+
+91
+
+We say that G1 is a bilinear group if the group operation
+in G1 and the bilinear map e : G1 × G1 → G2 are both
+eﬃciently computable. Notice that the map e is symmetric
+since e(g a , g b ) = e(g, g)ab = e(g b , g a ).
+
+4.2 Our Construction
+Let G1 be a bilinear group of prime order p, and let g
+be a generator of G1 . In addition, let e : G1 × G1 → G2
+denote the bilinear map. A security parameter, κ, will determine the size of the groups. We also deﬁne the Lagrange
+for i ∈ Zp and a set, S, of elements in
+coeﬃcient Δi,S 
+x−j
+Zp : Δi,S (x) =
+j∈S,j=i i−j . We will associate each attribute with a unique element in Z∗p . Our construction follows.
+
+3.3 The Decisional Bilinear Diffie-Hellman
+(BDH) Assumption
+Let a, b, c, z ∈ Zp be chosen at random and g be a generator of G1 . The decisional BDH assumption [7, 32] is that no
+probabilistic polynomial-time algorithm B can distinguish
+the tuple (A = g a , B = g b , C = g c , e(g, g)abc ) from the tuple (A = g a , B = g b , C = g c , e(g, g)z ) with more than a
+negligible advantage. The advantage of B is
+
+Setup Deﬁne the universe of attributes U = {1, 2, . . . , n}.
+Now, for each attribute i ∈ U, choose a number ti uniformly
+at random from Zp . Finally, choose y uniformly at random
+in Zp . The published public parameters PK are
+
+Pr[B(A, B, C, e(g, g)abc ) = 0] − Pr[B(A, B, C, e(g, g)z ) = 0]
+
+T1 = g t1 , . . . , T|U | = g t|U| , Y = e(g, g)y .
+
+where the probability is taken over the random choice of the
+generator g, the random choice of a, b, c, z in Zp , and the
+random bits consumed by B.
+
+The master key MK is:
+
+4.
+
+Encryption (M, γ, PK)
+To encrypt a message M ∈ G2
+under a set of attributes γ, choose a random value s ∈ Zp
+and publish the ciphertext as:
+
+t1 , . . . , t|U | , y .
+
+CONSTRUCTION FOR ACCESS TREES
+
+In the access-tree construction, ciphertexts are labeled
+with a set of descriptive attributes. Private keys are identiﬁed by a tree-access structure in which each interior node
+of the tree is a threshold gate and the leaves are associated
+with attributes. (We note that this setting is very expressive. For example, we can represent a tree with “AND” and
+“OR” gates by using respectively 2 of 2 and 1 of 2 threshold
+gates.) A user will be able to decrypt a ciphertext with a
+given key if and only if there is an assignment of attributes
+from the ciphertexts to nodes of the tree such that the tree
+is satisﬁed.
+
+
+
+E = (γ, E = M Y s , {Ei = Tis }i∈γ ) .
+Key Generation (T , MK) The algorithm outputs a key
+that enables the user to decrypt a message encrypted under
+a set of attributes γ if and only if T (γ) = 1. The algorithm
+proceeds as follows. First choose a polynomial qx for each
+node x (including the leaves) in the tree T . These polynomials are chosen in the following way in a top-down manner,
+starting from the root node r.
+For each node x in the tree, set the degree dx of the polynomial qx to be one less than the threshold value kx of that
+node, that is, dx = kx − 1. Now, for the root node r, set
+qr (0) = y and dr other points of the polynomial qr randomly to deﬁne it completely. For any other node x, set
+qx (0) = qparent(x) (index(x)) and choose dx other points randomly to completely deﬁne qx .
+Once the polynomials have been decided, for each leaf
+node x, we give the following secret value to the user:
+
+4.1 Access Trees
+Access tree T . Let T be a tree representing an access structure. Each non-leaf node of the tree represents
+a threshold gate, described by its children and a threshold
+value. If numx is the number of children of a node x and kx
+is its threshold value, then 0 < kx ≤ numx . When kx = 1,
+the threshold gate is an OR gate and when kx = numx , it
+is an AND gate. Each leaf node x of the tree is described
+by an attribute and a threshold value kx = 1.
+To facilitate working with the access trees, we deﬁne a few
+functions. We denote the parent of the node x in the tree by
+parent(x). The function att(x) is deﬁned only if x is a leaf
+node and denotes the attribute associated with the leaf node
+x in the tree. The access tree T also deﬁnes an ordering between the children of every node, that is, the children of a
+node are numbered from 1 to num. The function index(x)
+returns such a number associated with the node x. Where
+the index values are uniquely assigned to nodes in the access
+structure for a given key in an arbitrary manner.
+
+Dx = g
+
+qx (0)
+ti
+
+where i = att(x) .
+
+The set of above secret values is the decryption key D.
+Decryption (E, D) We specify our decryption procedure
+as a recursive algorithm . For ease of exposition we present
+the simplest form of the decryption algorithm and discuss
+potential performance improvements in the next subsection.
+We ﬁrst deﬁne a recursive algorithm DecryptNode(E, D, x)
+that takes as input the ciphertext E = (γ, E  , {Ei }i∈γ ), the
+private key D (we assume the access tree T is embedded
+in the private key), and a node x in the tree. It outputs a
+group element of G2 or ⊥.
+Let i = att(x). If the node x is a leaf node then:
+
+Satisfying an access tree. Let T be an access tree with
+root r. Denote by Tx the subtree of T rooted at the node x.
+Hence T is the same as Tr . If a set of attributes γ satisﬁes
+the access tree Tx , we denote it as Tx (γ) = 1. We compute
+Tx (γ) recursively as follows. If x is a non-leaf node, evaluate
+Tx (γ) for all children x of node x. Tx (γ) returns 1 if and
+only if at least kx children return 1. If x is a leaf node, then
+Tx (γ) returns 1 if and only if att(x) ∈ γ.
+
+DecryptNode(E, D, x) =
+
+
+qx (0)
+
+
+e(Dx , Ei ) = e(g ti , g s·ti )
+
+
+
+s·qx (0)
+
+= e(g, g)
+
+
+
+
+
+
+
+if i ∈ γ
+
+⊥ otherwise
+
+We now consider the recursive case when x is a non-leaf
+node. The algorithm DecryptNode(E, D, x) then proceeds
+
+92
+
+secret key for an access structure T where T (γ) = 0. To
+generate the secret key, B needs to assign a polynomial Qx
+of degree dx for every node in the access tree T .
+We ﬁrst deﬁne the following two procedures: PolySat and
+PolyUnsat.
+
+as follows: For all nodes z that are children of x, it calls
+DecryptNode(E, D, z) and stores the output as Fz . Let Sx
+be an arbitrary kx -sized set of child nodes z such that Fz =
+⊥. If no such set exists then the node was not satisﬁed and
+the function returns ⊥.
+Otherwise, we compute:
+
+
+Fx
+
+=
+
+Δ
+
+Fz
+z∈Sx
+
+
+=
+
+ (0)
+i,Sx
+
+where S  ={index(z):z∈S }
+x
+
+x
+
+Δ
+
+(e(g, g)
+z∈Sx
+
+
+e(g, g)
+
+=
+
+,
+
+ (0)
+
+(e(g, g)s·qz (0) ) i,Sx
+
+z∈Sx
+
+
+=
+
+PolySat(Tx , γ, λx ) This procedure sets up the polynomials
+for the nodes of an access sub-tree with satisﬁed root
+node, that is, Tx (γ) = 1. The procedure takes an
+access tree Tx (with root node x) as input along with
+a set of attributes γ and an integer λx ∈ Zp .
+
+i=index(z)
+
+s·qparent(z) (index(z)) Δi,S  (0)
+
+)
+
+s·qx (i)·Δ
+
+x
+
+It ﬁrst sets up a polynomial qx of degree dx for the
+root node x. It sets qx (0) = λx and then sets rest of
+the points randomly to completely ﬁx qx . Now it sets
+polynomials for each child node x of x by calling the
+procedure PolySat(Tx , γ, qx (index(x ))). Notice that
+in this way, qx (0) = qx (index(x )) for each child node
+x of x.
+
+(by constr.)
+
+ (0)
+i,Sx
+
+z∈Sx
+
+= e(g, g)s·qx (0)
+
+(using polynomial interpolation)
+
+PolyUnsat(Tx , γ, g λx ) This procedure sets up the polynomials for the nodes of an access tree with unsatisﬁed
+root node, that is, Tx (γ) = 0. The procedure takes an
+access tree Tx (with root node x) as input along with
+a set of attributes γ and an element g λx ∈ G1 (where
+λx ∈ Zp ).
+
+and return the result.
+Now that we have deﬁned our function DecryptNode, the
+decryption algorithm simply calls the function on the root of
+the tree. We observe that DecryptNode(E, D, r) = e(g, g)ys
+= Y s if and only if the ciphertext satisﬁes the tree. Since,
+E  = M Y s the decryption algorithm simply divides out Y s
+and recovers the message M .
+We discuss how to optimize the decryption procedure in
+the full version of this paper [21].
+
+It ﬁrst deﬁnes a polynomial qx of degree dx for the
+root node x such that qx (0) = λx . Because Tx (γ) = 0,
+no more than dx children of x are satisﬁed. Let hx ≤
+dx be the number of satisﬁed children of x. For each
+satisﬁed child x of x, the procedure chooses a random
+point λx ∈ Zp and sets qx (index(x )) = λx . It then
+ﬁxes the remaining dx − hx points of qx randomly to
+completely deﬁne qx . Now the algorithm recursively
+deﬁnes polynomials for the rest of the nodes in the tree
+as follows. For each child node x of x, the algorithm
+calls:
+
+4.3 Proof of Security
+We prove that the security of our scheme in the attributebased Selective-Set model reduces to the hardness of the
+Decisional BDH assumption.
+Theorem 1. If an adversary can break our scheme in the
+Attribute-based Selective-Set model, then a simulator can be
+constructed to play the Decisional BDH game with a nonnegligible advantage.
+
+– PolySat(Tx , γ, qx (index(x ))), if x is a satisﬁed
+node. Notice that qx (index(x )) is known in this
+case.
+
+Proof: Suppose there exists a polynomial-time adversary
+A, that can attack our scheme in the Selective-Set model
+with advantage . We build a simulator B that can play the
+Decisional BDH game with advantage /2. The simulation
+proceeds as follows:
+We ﬁrst let the challenger set the groups G1 and G2 with
+an eﬃcient bilinear map, e and generator g. The challenger
+ﬂips a fair binary coin μ, outside of B’s view. If μ = 0,
+the challenger sets (A, B, C, Z) = (g a , g b , g c , e(g, g)abc ); otherwise it sets (A, B, C, Z) = (g a , g b , g c , e(g, g)z ) for random
+a, b, c, z. We assume the universe, U is deﬁned.
+
+
+
+– PolyUnsat(Tx , γ, g qx (index(x )) ), if x is not a sat
+isﬁed node. Notice that only g qx (index(x )) can be
+qx (0)
+obtained by interpolation as only g
+is known
+in this case.
+Notice that in this case also, qx (0) = qx (index(x )) for
+each child node x of x.
+To give keys for access structure T , simulator ﬁrst runs
+PolyUnsat(T , γ, A) to deﬁne a polynomial qx for each node
+x of T . Notice that for each leaf node x of T , we know
+qx completely if x is satisﬁed; if x is not satisﬁed, then at
+least g qx (0) is known (in some cases qx might be known completely). Furthermore, qr (0) = a.
+Simulator now deﬁnes the ﬁnal polynomial Qx (·) = bqx (·)
+for each node x of T . Notice that this sets y = Qr (0) = ab.
+The key corresponding to each leaf node is given using its
+polynomial as follows. Let i = att(x).
+
+Init
+The simulator B runs A. A chooses the set of attributes γ it wishes to be challenged upon.
+Setup The simulator sets the parameter Y = e(A, B) =
+e(g, g)ab . For all i ∈ U, it sets Ti as follows: if i ∈ γ, it
+chooses a random ri ∈ Zp and sets Ti = g ri (thus, ti = ri );
+otherwise it chooses a random βi ∈ Zp and sets Ti = g bβi =
+B βi (thus, ti = bβi ). It then gives the public parameters to
+A.
+
+
+
+
+Dx =
+
+Phase 1 A adaptively makes requests for the keys corresponding to any access structures T such that the challenge
+set γ does not satisfy T . Suppose A makes a request for the
+
+
+
+g
+
+Qx (0)
+ti
+
+g
+
+Qx (0)
+ti
+
+=g
+
+bqx (0)
+ri
+
+=g
+
+bqx (0)
+bβi
+
+=B
+=g
+
+qx (0)
+ri
+
+qx (0)
+βi
+
+if i ∈ γ
+otherwise
+
+Therefore, the simulator is able to construct a private key
+for the access structure T . Furthermore, the distribution
+
+93
+
+of the private key for T is identical to that in the original
+scheme.
+
+As noted in [32], having large universe allows us to apply
+a collision resistant hash function H : {0, 1}∗ → Z∗p and use
+arbitrary strings, that were not necessarily considered during public key setup, as attributes. For example we can add
+any veriﬁable attribute, such as “Lives in Beverly Hills”, to
+a user’s private key.
+
+Challenge
+The adversary A, will submit two challenge
+messages m0 and m1 to the simulator. The simulator ﬂips
+a fair binary coin ν, and returns an encryption of mν . The
+ciphertext is output as:
+E = (γ, E  = mν Z, {Ei = C ri }i∈γ )
+
+5.1 Description
+Let G1 be a bilinear group of prime order p, and let g be a
+generator of G1 . Additionally, let e : G1 × G1 → G2 denote
+the bilinear map. A security parameter, κ, will determine
+the size of the groups. Also deﬁne the Lagrange coeﬃcient
+Δi,S for i ∈ Zp and a set, S, of elements in Zp , exactly as
+before. The data will be encrypted under a set γ of n elements4 of Z∗p . Our construction follows.
+
+abc
+
+If μ = 0 then Z = e(g, g) . If we let s = c, then we
+have Y s = (e(g, g)ab )c = e(g, g)abc , and Ei = (g ri )c = C ri .
+Therefore, the ciphertext is a valid random encryption of
+message mν .
+Otherwise, if μ = 1, then Z = e(g, g)z . We then have
+
+E = mν e(g, g)z . Since z is random, E  will be a random
+element of G2 from the adversaries view and the message
+contains no information about mν .
+Phase 2
+
+Setup (n) Choose a random value y ∈ Zp and let g1 = g y .
+Now choose a random element g2 of G1 .
+Next, choose t1 , . . . , tn+1 uniformly at random from G1 .
+Let N be the set {1, 2, . . . , n + 1}. Deﬁne a function T , as:
+
+The simulator acts exactly as it did in Phase 1.
+
+Guess
+A will submit a guess ν  of ν. If ν  = ν the
+simulator will output μ = 0 to indicate that it was given a
+valid BDH-tuple otherwise it will output μ = 1 to indicate
+it was given a random 4-tuple.
+As shown in the construction the simulator’s generation
+of public parameters and private keys is identical to that of
+the actual scheme.
+In the case where μ = 1 the adversary gains no information about ν. Therefore, we have Pr[ν = ν  |μ = 1] = 12 .
+Since the simulator guesses μ = 1 when ν = ν  , we have
+Pr[μ = μ|μ = 1] = 12 .
+If μ = 0 then the adversary sees an encryption of mν . The
+adversary’s advantage in this situation is  by deﬁnition.
+Therefore, we have Pr[ν = ν  |μ = 0] = 12 + . Since the
+simulator guesses μ = 0 when ν = ν  , we have Pr[μ =
+μ|μ = 0] = 12 + .
+The overall advantage of the simulator in the Decisional
+BDH game is 12 Pr[μ = μ|μ = 0] + 12 Pr[μ = μ|μ = 1] − 12 =
+1 1
+( + ) + 12 12 − 12 = 12 .
+2 2
+
+n+1
+
+T (X) = g2X
+
+Δ
+
+ti i,N
+
+(X)
+
+.
+
+i=1
+n
+
+Function T can be viewed as the function g2X g h(X) for
+some n degree polynomial h. The public parameters PK
+are: g1 , g2 , t1 , . . . , tn+1 and the master key MK is: y.
+Encryption (m, γ, PK)
+To encrypt a message m ∈ G2
+under a set of attributes γ, choose a random value s ∈ Zp
+and publish the ciphertext as:
+
+
+
+
+E = (γ, E = me(g1 , g2 )s , E = g s , {Ei = T (i)s }i∈γ ).
+Key Generation (T , MK, PK) The algorithm outputs a
+key which enables the user to decrypt a message encrypted
+under a set of attributes γ, if and only if T (γ) = 1. The
+algorithm proceeds as follows. First choose a polynomial qx
+for each non-leaf node x in the tree T . These polynomials are chosen in the following way in a top down manner,
+starting from the root node r.
+For each node x in the tree, set the degree dx of the polynomial qx to be one less than the threshold value kx of that
+node, that is, dx = kx − 1. Now for the root node r, set
+qr (0) = y and dr other points of the polynomial qr randomly to deﬁne it completely. For any other node x, set
+qx (0) = qparent(x) (index(x)) and choose dx other points randomly to completely deﬁne qx .
+Once the polynomials have been decided, for each leaf
+node x, we give the following secret values to the user:
+
+Chosen-Ciphertext Security. Our security deﬁnitions
+and proofs have been in the chosen-plaintext model. Similar to [32], we notice that our construction can be extended
+to the chosen-ciphertext model by applying the technique
+of using simulation-sound NIZK proofs to achieve chosenciphertext security [31]. However, in Section 9 we describe
+how our delegation mechanism can be used with the techniques of Cannetti, Halevi, and Katz [16] to achieve a much
+more eﬃcient CCA-2 system.
+
+5.
+
+n 
+
+LARGE UNIVERSE CONSTRUCTION
+
+Dx
+Rx
+
+In our previous constructions, the size of public parameters grows linearly with the number of possible attributes in
+the universe. Combining the tricks presented in section 4
+with those in the large universe construction of Sahai and
+Waters [32], we construct another scheme which uses all elements in Z∗p as the universe. Yet the size of public parameters only grow linearly in a parameter n. The parameter n
+is the maximum size of the set γ we can encrypt under. 3
+
+q (0)
+
+= g2 x
+= g rx
+
+· T (i)rx
+
+where i = att(x)
+
+where rx is chosen uniformly at random from Zp for each
+node x. The set of above secret pairs is the decryption key
+D.
+(see [30] for details). This also improves the eﬃciency of the
+system.
+4
+With some minor modiﬁcations, which we omit for simplicity, we can encrypt to all sets of size ≤ n.
+
+3
+
+If we are willing to accept random oracles [4], it is possible
+to overcome the size-limitation on γ by replacing the function T (X) in our construction (see Setup) by a hash function
+
+94
+
+1) Adding a new trivial gate to T
+This operation involves adding a new node y above an
+existing node x. The new node y represents a (1, 1) threshold
+gate which after adding becomes the parent of x. The former
+parent of x (if x is not the root node), say z, becomes the
+parent of y.
+Since the threshold of y is 1, we are required to associate
+a 0 degree polynomial qy with it such that qx (0) = qy (x))
+and qy (0) = qz (y)). The second condition essentially ﬁxes
+qy and the ﬁrst one is automatically satisﬁed since z was the
+parent of x earlier. Hence, no changes to the private key are
+required for this operation.
+2) Manipulating an existing (t, n)-gate in T
+This operation involves manipulating a threshold gate so
+as to make the access structure more restrictive. The operation could be of the following three types.
+
+Decryption (E, D) As for the case of small universe, we
+ﬁrst deﬁne a recursive algorithm DecryptNode(E, D, x) that
+takes as input the ciphertext E = (γ, E  , E  , {Ei }i∈γ ), the
+private key D (we assume the access tree T is embedded
+in the private key), and a node x in the tree. It outputs a
+group element of G2 or ⊥ as follows.
+Let i = att(x). If the node x is a leaf node then:
+
+q (0)
+
+e(g2x
+·T (i)rx ,g s )
+ e(Dx ,E )
+
+=
+
+e(R
+,E
+)
+e(g rx ,T (i)s )
+x
+i
+
+
+q (0) s
+
+e(g2x
+,g )·e(T (i)rx ,g s )
+
+
+=
+e(g rx ,T (i)s )
+DecryptNode(E, D, x) = = e(g, g )s·qx (0) if i ∈ γ
+2
+
+
+
+
+
+
+
+
+
+⊥ otherwise
+
+We now consider the recursive case when x is a non-leaf
+node. The algorithm DecryptNode(E, D, x) then proceeds
+as follows: For all nodes z that are children of x, it calls
+DecryptNode(E, D, z) and stores the output as Fz . Let Sx
+be an arbitrary kx -sized set of child nodes z such that Fz =
+⊥. If no such set exists then the node was not satisﬁed and
+the function returns ⊥.
+Otherwise, we compute:
+
+
+Fx
+
+=
+
+Δ
+
+Fz
+z∈Sx
+
+
+=
+z∈Sx
+
+
+=
+
+ (0)
+i,Sx
+
+qx (X) = (X + 1)qx (X)
+
+i=index(z)
+
+Now, we change the key such that qx becomes the new
+polynomial of the node x. This is done as follows. For every
+child y of x, compute the constant Cx = y) + 1. For every
+leaf node z in the subtree5 Ty , compute the new decryption
+key as
+
+where S  ={index(z):z∈S }
+x
+
+x
+
+Δ
+
+ (0)
+
+(e(g, g2 )s·qz (0) ) i,Sx
+
+Δ
+
+ (0)
+
+(e(g, g2 )s·qparent(z) (index(z)) ) i,Sx
+
+z∈Sx
+
+
+e(g, g2 )
+
+=
+
+,
+
+2.1) Converting a (t, n)-gate to a (t+1, n)-gate with (t+1) ≤
+n
+Consider a node x representing a (t, n)-gate. Clearly, the
+polynomial qx has the degree (t − 1) which has to be increased to t. Deﬁne a new polynomial qx as follows.
+
+s·qx (0)·Δ
+
+Dz = (Dz )Cx , Rz = (Rz )Cx
+
+(by constr.)
+
+The above results in the multiplication of all the polynomials
+in the subtree Ty with the constant Cx . Hence, qy (0) =
+(y) + 1)qy (0) which is indeed a point on the new polynomial
+qx . Note that since qx (0) = qx (0), no changes outside the
+subtree Tx are required.
+The above procedure eﬀectively changes x from a (t, n)gate to a (t + 1, n)-gate and yields the corresponding new
+private key.
+
+ (0)
+i,Sx
+
+z∈Sx
+
+= e(g, g2 )s·qx (0)
+
+(using polynomial interpolation)
+
+and return the result.
+Now that we have deﬁned our function DecryptNode, the
+decryption algorithm simply calls the function on the root of
+the tree. We observe that DecryptNode(E, D, r) = e(g, g2 )ys
+= e(g1 , g2 )s if and only if the ciphertext satisﬁes the tree.
+Since, E  = me(g1 , g2 )s the decryption algorithm simply divides out e(g1 , g2 )s and recovers the message m.
+For a security proof of this construction, see [21].
+
+6.
+
+2.2) Converting a (t, n)-gate to a (t + 1, n + 1)-gate
+This procedure involves adding a new subtree (with root
+say z) as a child of a node x while increasing the degree of
+x by 1 at the same time. Let z be the v th child of x so that
+z) = v. We shall change the polynomial qx to the following.
+
+DELEGATION OF PRIVATE KEYS
+
+qx (X) = (aX + 1)qx (X) where a =
+
+In our large universe construction, individual users can
+generate new private keys using their private keys, which
+can then be delegated to other users. A user which has a
+private key corresponding to an access tree T can compute a
+new private key corresponding to ANY access tree T  which
+is more restrictive than T (i.e., T  ⊆ T ). Thus, the users
+are capable to acting as a local key authority which can
+generate and distribute private keys to other users.
+Computation of a new private key from an existing private key is done by applying a set of basic operations on
+the existing key. These operations are aimed at step by
+step conversion of the given private key for an access tree T
+to a private key for the targeted access tree T  (given that
+T  ⊆ T ). In the following, a (t, n)-gate denotes a gate with
+threshold t and number of children n. The operations are
+as follows.
+
+−1
+v
+
+As in the previous operation, for every (existing) child y of
+x, the polynomials in the subtree Ty are multiplied with the
+appropriate constant Cx = a.y) + 1. This ensures that qy (0)
+is indeed a point on qx . Further, set qz (0) = 0 (= qx (v)).
+Given qz (0), keys can be created for the subtree Tz as in the
+original key generation algorithm. Hence, the keys of the
+subtrees of all the children (old as well as new) of the node
+x have been made consistent with the new polynomial qx ,
+thus achieving our goal.
+2.3) Converting a (t, n)-gate to a (t, n − 1)-gate with t ≤
+(n − 1)
+This operation involves deleting a child y of a node x.
+This can be easily achieved just by deleting decryption keys
+5
+
+95
+
+Recall that Ty denotes the subtree deﬁned by y as its root.
+
+corresponding to all the leaves of Ty from the original decryption key.
+3) Re-randomizing the obtained key
+Once we obtain a key for the desired access structure (by
+applying a set of operations of type 1 and 2), we apply a ﬁnal
+re-randomization step to make it independent of the original key from which it was computed. Re-randomization of
+a node x with a (known) constant Cx is done as follows.
+Choose a random polynomial px of degree6 dx such that
+px (0) = Cx . Deﬁne the new polynomial qx as qx (X) =
+qx (X) + px (X). We have to change the key such that qx
+becomes the new polynomial of node x. This is done by
+recursively re-randomizing every child y of x with the constant Cy = px (y)). If y is a leaf node, the new decryption
+key corresponding to y is computed as follows.
+
+7. AUDIT LOG APPLICATION
+An important application of KP-ABE deals with secure
+forensic analysis: One of the most important needs for electronic forensic analysis is an “audit log” containing a detailed account of all activity on the system or network to
+be protected. Such audit logs, however, raise signiﬁcant security concerns: a comprehensive audit log would become
+a prized target for enemy capture. Merely encrypting the
+audit log is not suﬃcient, since then any party who needs
+to legitimately access the audit log contents (for instance
+a forensic analyst) would require the secret key – thereby
+giving this single analyst access to essentially all secret information on the network. Such problematic security issues arise in nearly every secure system, and particularly
+in large-scale networked systems such as the Global Information Grid, where diverse secret, top secret, and highly
+classiﬁed information will need to appear intermingled in
+distributed audit logs.
+Our KP-ABE system provides an attractive solution to
+the audit log problem. Audit log entries could be annotated
+with attributes such as, for instance, the name of the user,
+the date and time of the user action, and the type of data
+modiﬁed or accessed by the user action. Then, a forensic
+analyst charged with some investigation would be issued a
+secret key associated with a particular “access structure” –
+which would correspond to the key allowing for a particular
+kind of encrypted search; such a key, for example, would
+only open audit log records whose attributes satisﬁed the
+condition that “the user name is Bob, OR (the date is between October 4, 2005 and October 7, 2005 AND the data
+accessed pertained to naval operations oﬀ the coast of North
+Korea)”. Our system would provide the guarantee that even
+if multiple rogue analysts collude to try to extract unauthorized information from the audit log, they will fail.
+A more concrete example audit-log application of our ABE
+system would be to the ArmyCERT program, which uses
+netﬂow logs [29]. Basically, an entry is created for every
+ﬂow (e.g. TCP connection), indexed by seven attributes:
+source IP address, destination IP address, L3 protocol type,
+source port, destination port, ToS byte (DSCP), and input
+logical interface (ifIndex). These aspects of every ﬂow are in
+the clear, and the payload can be encrypted using our ABE
+system with these ﬁelds as attributes.
+Note that in our scheme, we would need to assume that
+the attributes associated with audit log entries would be
+available to all analysts.7 This may present a problem in
+highly secret environments where even attributes themselves
+would need to be kept hidden from analysts. We leave the
+problem of constructing KP-ABE systems where attributes
+associated with ciphertexts remain secret as an important
+open problem.
+
+Dy = Dy .g2 Cy .T (i)ry , Ry = Ry .g ry
+Where i = att(y) and ry is chosen randomly.
+Now, re-randomization of the private key is done just by
+re-randomizing the root node r with the constant Cr = 0.
+The key obtained is the ﬁnal key ready to be distributed to
+other users.
+In the following theorem, we prove that the above set of
+operations is complete. That is, give a key for an access tree
+T , this set of operations is suﬃcient to compute a key for
+ANY access tree T  which is more restrictive than T .
+Theorem 2 (Completeness Theorem). The given
+set of operations is complete.
+Proof: We can obtain a key for an access tree T  from
+a key for T using the following general technique. Add a
+new trivial gate x (using operation 1) above the root node
+of T so that the new gate becomes the root node. Now we
+apply operation 2.2 to x to convert it from a (1, 1)-gate to
+a (2, 2)-gate. The new subtree added as a child of x corresponds to the access tree T  . Finally, we re-randomize the
+key obtained (operation 3). This gives us a key for the access
+structure (T AND T  ). However, since T  is more restrictive than T , this access structure is equivalent to T  itself.
+Hence, we have obtained a key for the access structure T  .
+We point out that this is a general method for obtaining a
+more restrictive access structure; in practice users will likely
+use the delegation tools described above in a more reﬁned
+manner to achieve shorter private key sizes and faster decryption times.
+In the above setting, we may imagine an entity having multiple private keys (procured from diﬀerent entities). We note
+that it is possible to use these multiple keys (for diﬀerent
+access structures) to compute a key for the targeted access
+structure. Given n keys for the access trees T1 , T2 , ... ,Tn ,
+using an operation similar to operation 1, we can connect
+them to obtain a single tree with an OR gate being the root
+node and T1 , T2 , ... ,Tn each being a child subtree of that
+OR gate. Thus, we obtain a single key for the access structure T = (T1 OR T2 OR ... OR Tn ). This key can then be
+used to generate new private keys.
+
+8. APPLICATION TO BROADCAST ENCR–
+YPTION: TARGETED BROADCAST
+We describe a new broadcast scenario that we call targeted
+broadcast. Consider the following setting.
+• A broadcaster broadcasts a sequence of diﬀerent items,
+each one labeled with a set of attributes describing
+7
+We observe that this does not mean that the attributes
+need be “public.” Our KP-ABE system’s ciphertexts could
+be re-encrypted, with a key that corresponds to the general
+clearance level of all analysts.
+
+6
+Recall that dx is the degree of the polynomial qx associated
+with the node x
+
+96
+
+Achieving CCA-Security and HIBE from Delegation. We brieﬂy outline how we can achieve eﬃcient CCA-2
+security and realize the Hierarchical Identity-Based Encryption by applying delegation techniques to the large universe
+construction.
+To achieve CCA-2 security an encyrptor will chooses a
+set γ of attributes to encrypt the message under and then
+generate a public/private key pair for a one time signature
+scheme. We let VK denote the bitstring represenation of
+the public key and let γ  be the set γ ∪ VK. The encryptor
+encrypts the ciphertext under the attributes γ  and then
+signs the ciphertext with the private key and attaches the
+signature and the public key description. Suppose a user
+has a key for access structure X wishes to decrypt. The
+user ﬁrst checks that the ciphertext is signed under VK and
+rejects the ciphertext otherwise. Then it creates an new
+key for the access structure of “X AND CCA : VK”. By
+similar arguments to those in Canetti, Halevi, and Katz [16]
+this gives chosen-ciphertex security. We can also use other
+methods [11, 12] to achieve greater eﬃciency.
+We can realize a HIBE by simply managing the the assignment of attributes in a careful manner. For example, to
+encrypt to the hierarchical identity “edu:ucla” one can encrypt to the set of attributes { “1-edu”, “2-ucla” }. Someone
+who has the top-level key for edu will have a policy that requires the attribute “1-edu” to be present. To delegate a key
+for “edu:ucla” it simply creates a policy for “1-edu”AND “2ucla” using our delegation techniques. We view the fact that
+a primitive HIBE follows so simply from our scheme as an
+attestation to the power of these techniques.
+
+the item. For instance, a television broadcaster might
+broadcast an episode of the show “24”, and label this
+item with attributes such as the name of the program
+(“24”), the genre (“drama”), the season, the episode
+number, the year, month, and date of original broadcast, the current year, month, and date, the name of
+the director, and the name of the producing company.
+• Each user is subscribed to a diﬀerent “package”. The
+user package describes an access policy, which along
+with the set of attributes describing any particular
+item being broadcast, determine whether or not the
+user should be able to access the item. For example,
+a television user may want to subscribe to a package
+that allows him view episodes of “24” from either the
+current season or Season 3. This could be encoded as
+policy as (“24” AND (“Season:5” OR “Season:3”)).
+The essential idea of Targeted Broadcast is to enjoy the
+economies-of-scale oﬀered by a broadcast channel, while still
+being able to deliver programming targeted at the needs
+or wishes of individual users. The growing acceptability of
+such a model can be seen by the rising popularity of DVR
+systems such as TiVo, which allow users to easily record only
+the programming they want in order to watch it later. In
+the case of television, taking the approach that we envision
+here would allow for much more ﬂexibility than just allowing
+users to select what channels they like.
+Our KP-ABE system naturally oﬀers a targeted broadcast
+system. A new symmetric key would be chosen and used to
+encrypt each item being broadcast, and then the KP-ABE
+system would be used to encrypt the symmetric key with the
+attributes associated with the item being broadcast. The
+KP-ABE system would precisely allow the ﬂexibility we envision in issuing private keys for the unique needs of each
+user.
+It is worth mentioning that handling such a situation with
+the best known broadcast encryption schemes [10, 22] (which
+allow encrypting to an arbitrary subset of users) is quite ineﬃcient in comparison. The eﬃciency of such systems is dependent on the size of the authorized user set or the number
+of users in the system [10, 22], and would also require the
+broadcaster to refer to its database of user authorizations
+each time a diﬀerent item is to be encrypted for broadcast.
+In our scheme, the encryption of an item would depend only
+on the properties of that item. The broadcaster could in
+principle even forget about the levels of access granted to
+each user after preparing a private key for the user.
+
+9.
+
+Ciphertext-Policy Attribute-Based Encryption. In
+this work, we considered the setting where ciphertexts are
+associated with sets of attributes, whereas user secret keys
+are associated with policies. As we have discussed, this setting has a number of natural applications. Another possibility is to have the reverse situation: user keys are associated with sets of attributes, whereas ciphertexts are associated with policies. We call such systems Ciphertext-Policy
+Attribute-Based Encryption (CP-ABE) systems. We note
+that the construction of Sahai and Waters [32] was most
+naturally considered in this framework. CP-ABE systems
+that allow for complex policies (like those considered here)
+would have a number of applications. An important example is a kind of sophisticated Broadcast Encryption, where
+users are described by (and therefore associated with) various attributes. Then, one could create a ciphertext that can
+be opened only if the attributes of a user match a policy.
+For instance, in a military setting, one could broadcast a
+message that is meant to be read only by users who have
+a rank of Lieutenant or higher, and who were deployed in
+South Korea in the year 2005. We leave constructing such
+a system as an important open problem.
+
+DISCUSSION AND EXTENSIONS
+
+We discuss various extensions to our scheme and open
+problems.
+Construction for any LSSS-realizable access structure. In our previous constructions, the access structure is
+a tree consisting of threshold gates. In an attempt to accommodate more general and complex access structures, we
+construct a scheme that can support all LSSS-realizable access structures. Since for every LSSS-realizable access structure, there exists a monotone span program that computes
+the corresponding boolean function and vice versa [3], our
+new construction supports all MSP-based access structures.
+Details are given in the full version of this paper [21].
+
+Searching on Encrypted Data. Our current constructions do not hide the set of attributes under which the data
+is encrypted. However, if it were possible to hide the attributes, then viewing attributes as keywords in such a system would lead to the ﬁrst general keyword-based search on
+encrypted data [8]. A search query could potentially be any
+monotone boolean formula of any number of keywords. We
+leave the problem of hiding the set of attributes as open.
+
+97
+
+10. REFERENCES
+
+[18] Y. Dodis, N. Fazio, A. Lysyanskaya, and D.F. Yao. ID-Based
+Encryption for Complex Hierarchies with Applications to
+Forward Security and Broadcast Encryption. In ACM
+conference on Computer and Communications Security
+(ACM CCS), pages 354–363, 2004.
+[19] Rita Gavriloaie, Wolfgang Nejdl, Daniel Olmedilla, Kent E.
+Seamons, and Marianne Winslett. No registration needed: How
+to use declarative policies and negotiation to access sensitive
+resources on the semantic web. In ESWS, pages 342–356, 2004.
+[20] Craig Gentry and Alice Silverberg. Hierarchical id-based
+cryptography. In ASIACRYPT, pages 548–566, 2002.
+[21] V. Goyal, O. Pandey, A. Sahai, and B. Waters. Attribute Based
+Encryption for Fine-Grained Access Conrol of Encrypted Data.
+Avaialble at: http://eprint.iacr.org/2006/.
+[22] D. Halevy and A. Shamir. The LSD Broadcast Encryption
+Scheme. In Advances in Cryptology – CRYPTO, volume 2442
+of LNCS, pages 47–60. Springer, 2002.
+[23] Hugh Harney, Andrea Colgrove, and Patrick Drew McDaniel.
+Principles of policy in secure groups. In NDSS, 2001.
+[24] Jeremy Horwitz and Ben Lynn. Toward hierarchical
+identity-based encryption. In Lars R. Knudsen, editor,
+EUROCRYPT, volume 2332 of Lecture Notes in Computer
+Science, pages 466–481. Springer, 2002.
+[25] M. Ito, A. Saito, and T. Nishizeki. Secret Sharing Scheme
+Realizing General Access Structure. In IEEE Globecom. IEEE,
+1987.
+[26] Myong H. Kang, Joon S. Park, and Judith N. Froscher. Access
+control mechanisms for inter-organizational workﬂow. In
+SACMAT ’01: Proceedings of the sixth ACM symposium on
+Access control models and technologies, pages 66–74, New
+York, NY, USA, 2001. ACM Press.
+[27] Jiangtao Li, Ninghui Li, and William H. Winsborough.
+Automated trust negotiation using cryptographic credentials.
+In ACM Conference on Computer and Communications
+Security, pages 46–57, 2005.
+[28] Patrick Drew McDaniel and Atul Prakash. Methods and
+limitations of security policy reconciliation. In IEEE
+Symposium on Security and Privacy, pages 73–87, 2002.
+[29] Cisco Networks. http://netflow.cesnet.cz/n netflow.php.
+[30] M. Pirretti, P. Traynor, P. McDaniel, and B. Waters. Secure
+Atrribute-Based Systems. In ACM conference on Computer
+and Communications Security (ACM CCS), 2006. To appear.
+[31] A. Sahai. Non-malleable non-interactive zero knowledge and
+adaptive chosen-ciphertext security. In IEEE Symposium on
+Foundations of Computer Science, 1999.
+[32] A. Sahai and B. Waters. Fuzzy Identity Based Encryption. In
+Advances in Cryptology – Eurocrypt, volume 3494 of LNCS,
+pages 457–473. Springer, 2005.
+[33] A. Shamir. How to share a secret. Commun. ACM,
+22(11):612–613, 1979.
+[34] A. Shamir. Identity Based Cryptosystems and Signature
+Schemes. In Advances in Cryptology – CRYPTO, volume 196
+of LNCS, pages 37–53. Springer, 1984.
+[35] Nigel P. Smart. Access control using pairing based
+cryptography. In CT-RSA, pages 111–121, 2003.
+[36] Ting Yu and Marianne Winslett. A uniﬁed scheme for resource
+protection in automated trust negotiation. In IEEE
+Symposium on Security and Privacy, pages 110–122, 2003.
+
+[1] Michel Abdalla, Dario Catalano, Alexander W. Dent, John
+Malone-Lee, Gregory Neven, and Nigel P. Smart.
+Identity-based encryption gone wild. In Michele Bugliesi, Bart
+Preneel, Vladimiro Sassone, and Ingo Wegener, editors, ICALP
+(2), volume 4052 of Lecture Notes in Computer Science, pages
+300–311. Springer, 2006.
+[2] S.G. Akl and P.D. Taylor. Cryptographic Solution to a Multi
+Level Security Problem. In Advances in Cryptology –
+CRYPTO, 1982.
+[3] A. Beimel. Secure Schemes for Secret Sharing and Key
+Distribution. PhD thesis, Israel Institute of Technology,
+Technion, Haifa, Israel, 1996.
+[4] M. Bellare and P. Rogaway. Random oracles are practical: A
+paradigm for designing eﬃcient protocols. In ACM conference
+on Computer and Communications Security (ACM CCS),
+pages 62–73, 1993.
+[5] J. Benaloh and Leichter J. Generalized Secret Sharing and
+Monotone Functions. In Advances in Cryptology – CRYPTO,
+volume 403 of LNCS, pages 27–36. Springer, 1988.
+[6] G. R. Blakley. Safeguarding cryptographic keys. In National
+Computer Conference, pages 313–317. American Federation of
+Information Processing Societies Proceedings, 1979.
+[7] D. Boneh and X. Boyen. Eﬃcient Selective-ID Secure Identity
+Based Encryption Without Random Oracles. In Advances in
+Cryptology – Eurocrypt, volume 3027 of LNCS, pages 223–238.
+Springer, 2004.
+[8] D. Boneh, G.D. Crescenzo, R. Ostrovsky, and G. Persiano.
+Public-Key Encryption with Keyword Search. In Advances in
+Cryptology – Eurocrypt, volume 3027 of LNCS, pages 506–522.
+Springer, 2004.
+[9] D. Boneh and M. Franklin. Identity Based Encryption from the
+Weil Pairing. In Advances in Cryptology – CRYPTO, volume
+2139 of LNCS, pages 213–229. Springer, 2001.
+[10] D. Boneh, C. Gentry, and B. Waters. Collusion Resistant
+Broadcast Encryption with Short Ciphertexts and Private
+Keys. In Advances in Cryptology – CRYPTO, volume 3621 of
+LNCS, pages 258–275. Springer, 2005.
+[11] Dan Boneh and Jonathan Katz. Improved eﬃciency for
+cca-secure cryptosystems built using identity-based encryption.
+In CT-RSA, pages 87–103, 2005.
+[12] Xavier Boyen, Qixiang Mei, and Brent Waters. Direct chosen
+ciphertext security from identity-based techniques. In ACM
+Conference on Computer and Communications Security,
+pages 320–329, 2005.
+[13] Robert W. Bradshaw, Jason E. Holt, and Kent E. Seamons.
+Concealing complex policies with hidden credentials. In ACM
+Conference on Computer and Communications Security,
+pages 146–157, 2004.
+[14] E. F. Brickell. Some ideal secret sharing schemes. Journal of
+Combinatorial Mathematics and Combinatorial Computing,
+6:105–113, 1989.
+[15] R. Canetti, S. Halevi, and J. Katz. A Forward-Secure
+Public-Key Encryption Scheme. In Advances in Cryptology –
+Eurocrypt, volume 2656 of LNCS. Springer, 2003.
+[16] R. Canetti, S. Halevi, and J. Katz. Chosen Ciphertext Security
+from Identity Based Encryption. In Advances in Cryptology –
+Eurocrypt, volume 3027 of LNCS, pages 207–222. Springer,
+2004.
+[17] Cliﬀord Cocks. An identity based encryption scheme based on
+quadratic residues. In IMA Int. Conf., pages 360–363, 2001.
+
+98
+
+
