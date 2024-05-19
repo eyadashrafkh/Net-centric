@@ -41,7 +41,7 @@ type KVServer struct {
 func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 	// Your code here.
 	// Put the value into the key/value database.
-	if args.isClient {
+	if args.IsClient {
 		if server.id == server.view.Primary {
 			if args.DoHash {
 				// If the PutArgs has DoHash set to true, hash the value before storing it.
@@ -89,7 +89,7 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 func (server *KVServer) Get(args *GetArgs, reply *GetReply) error {
 	// Your code here.
 	// Get the value from the key/value database.
-	if args.isClient {
+	if args.IsClient {
 		if server.id == server.view.Primary {
 			value, ok := server.data[args.Key]
 			if ok {
