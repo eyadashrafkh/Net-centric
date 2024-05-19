@@ -37,11 +37,15 @@ type KVServer struct {
 	backup    string
 	hasBackup bool
 	data      map[string]string
+	mu        sync.RWMutex
 }
 
 func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 	// Your code here.
 	// Put the value into the key/value database.
+	server.mu.Lock()
+	defer server.mu.Unlock()
+	
 	if args.IsClient {
 		if server.id == server.view.Primary {
 			if args.DoHash {
