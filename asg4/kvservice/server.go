@@ -55,7 +55,16 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 					reply.Err = ErrNoKey
 					reply.PreviousValue = ""
 				}
-				server.data[args.Key] = fmt.Sprintf("%v", hashedValue)
+				val := fmt.Sprintf("%v", hashedValue)
+				server.data[args.Key] = val
+				args := &PutArgs{args.Key, val, false, false}
+				reply := &PutReply{}
+				if server.hasBackup {
+					err := call(server.backup, "KVServer.Put", args, reply)
+					if err != true {
+						return nil
+					}
+				}
 			} else {
 				// If the PutArgs has DoHash set to false, store the value as is.
 				previousValue, ok := server.data[args.Key]
@@ -67,6 +76,14 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 					reply.PreviousValue = ""
 				}
 				server.data[args.Key] = args.Value
+				args := &PutArgs{args.Key, args.Value, false, false}
+				reply := &PutReply{}
+				if server.hasBackup {
+					err := call(server.backup, "KVServer.Put", args, reply)
+					if err != true {
+						return nil
+					}
+				}
 			}
 		} else {
 			reply.Err = ErrWrongServer
@@ -74,15 +91,29 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 		}
 	} else {
 		// If the PutArgs is not from a client, store the value as is.
-		previousValue, ok := server.data[args.Key]
-		if ok {
-			reply.Err = OK
-			reply.PreviousValue = previousValue
+		if args.DoHash {
+			previousValue, ok := server.data[args.Key]
+			hashedValue := hash(args.Value + previousValue)
+			if ok {
+				reply.Err = OK
+				reply.PreviousValue = previousValue
+			} else {
+				reply.Err = ErrNoKey
+				reply.PreviousValue = ""
+			}
+			val := fmt.Sprintf("%v", hashedValue)
+			server.data[args.Key] = val
 		} else {
-			reply.Err = ErrNoKey
-			reply.PreviousValue = ""
+			previousValue, ok := server.data[args.Key]
+			if ok {
+				reply.Err = OK
+				reply.PreviousValue = previousValue
+			} else {
+				reply.Err = ErrNoKey
+				reply.PreviousValue = ""
+			}
+			server.data[args.Key] = args.Value
 		}
-		server.data[args.Key] = args.Value
 	}
 	return nil
 }
