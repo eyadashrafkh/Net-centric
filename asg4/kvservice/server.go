@@ -14,7 +14,7 @@ import (
 )
 
 // Debugging
-const Debug = 1
+const Debug = 0
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {
 	if Debug > 0 {
@@ -34,10 +34,11 @@ type KVServer struct {
 	finish      chan interface{}
 
 	// Add your declarations here.
-	backup string
+	backup    string
 	hasBackup bool
-	data map[string]string
+	data      map[string]string
 }
+
 func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 	// Your code here.
 	// Put the value into the key/value database.
@@ -123,20 +124,16 @@ func (server *KVServer) tick() {
 	// This line will give an error initially as view and err are not used.
 	view, err := server.monitorClnt.Ping(server.view.Viewnum)
 	if err != nil {
-        log.Printf("KVServer(%v) tick: error pinging view server: %v\n", server.id, err)
-        return
-    }
+		return
+	}
 	// Your code here.
 	server.view = view
-	log.Printf("KVServer(%v) tick: view = %v\n", server.id, server.view)
 	// Determine the server's role based on the view.
-    if server.id == server.view.Primary {
-        log.Printf("KVServer(%v) is the Primary\n", server.id)
-        // If the server is the primary and detects a new backup, handle the data forwarding.
-        if server.view.Backup != "" {
+	if server.id == server.view.Primary {
+		// If the server is the primary and detects a new backup, handle the data forwarding.
+		if server.view.Backup != "" {
 			if server.view.Backup != server.backup {
 				// If the server is the primary and there is a new backup, update the backup state.
-				log.Printf("Primary KVServer(%v) tick: new backup detected: %v\n", server.id, server.view.Backup)
 				server.backup = server.view.Backup
 				server.hasBackup = true
 				// Forward data to the new backup.
@@ -145,7 +142,6 @@ func (server *KVServer) tick() {
 					reply := &PutReply{}
 					err := call(server.backup, "KVServer.Put", args, reply)
 					if err != true {
-						log.Printf("Primary KVServer(%v) tick: error forwarding data to new backup: %v\n", server.id, err)
 						return
 					}
 				}
@@ -156,13 +152,13 @@ func (server *KVServer) tick() {
 			server.backup = ""
 		}
 
-    } else if server.id == server.view.Backup {
-        log.Printf("KVServer(%v) is the Backup\n", server.id)
-        // Perform backup-specific tasks if any (e.g., ready to accept data from the primary).
-    } else {
-        log.Printf("KVServer(%v) is neither Primary nor Backup\n", server.id)
-        // Perform tasks for servers that are neither primary nor backup.
-    }
+	} else if server.id == server.view.Backup {
+		//log.Printf("KVServer(%v) is the Backup\n", server.id)
+		// Perform backup-specific tasks if any (e.g., ready to accept data from the primary).
+	} else {
+		//log.Printf("KVServer(%v) is neither Primary nor Backup\n", server.id)
+		// Perform tasks for servers that are neither primary nor backup.
+	}
 }
 
 // tell the server to shut itself down.
