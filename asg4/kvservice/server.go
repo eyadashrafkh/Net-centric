@@ -123,7 +123,7 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 	// Put the value into the key/value database.
 	server.mu.Lock()
 	defer server.mu.Unlock()
-	
+
 	if args.IsClient {
 		if server.id == server.view.Primary {
 			if args.DoHash {
