@@ -57,7 +57,7 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 		reply.PreviousValue = prevReply.PreviousValue
 		return nil
 	}
-	
+
 	if args.IsClient {
 		if server.id == server.view.Primary {
 			if args.DoHash {
@@ -116,7 +116,7 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 		// If the PutArgs is not from a client, store the value as is.
 		if args.DoHash {
 			previousValue, ok := server.data[args.Key]
-			hashedValue := hash(args.Value + previousValue)
+			hashedValue := hash(previousValue + args.Value)
 			reply.Err = OK
 			if ok {
 				reply.PreviousValue = previousValue
@@ -184,12 +184,17 @@ func (server *KVServer) Get(args *GetArgs, reply *GetReply) error {
 
 // ping the viewserver periodically.
 func (server *KVServer) tick() {
+	server.mu.Lock()
+	defer server.mu.Unlock()
 	// This line will give an error initially as view and err are not used.
-	view, err := server.monitorClnt.Ping(server.view.Viewnum)
-	if err != nil {
-		return
+	view := ;
+	for {
+		view, err := server.monitorClnt.Ping(server.view.Viewnum)
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second) // Add a delay before retrying
 	}
-	// Your code here.
 	server.view = view
 	// Determine the server's role based on the view.
 	if server.id == server.view.Primary {

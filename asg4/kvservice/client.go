@@ -81,7 +81,6 @@ func (client *KVClient) Get(key string) string {
 		return ""
 	}
 	for {
-		client.updateView()
 		primary := client.view.Primary
 		args := GetArgs{Key: key, IsClient: true}
 		var reply GetReply
@@ -89,6 +88,7 @@ func (client *KVClient) Get(key string) string {
 		if ok && reply.Err == OK {
 			return reply.Value
 		}
+		client.updateView()
 	}
 }
 
@@ -108,7 +108,6 @@ func (client *KVClient) PutAux(key string, value string, dohash bool) string {
 		args := PutArgs{Key: key, Value: value, DoHash: dohash, IsClient: true, RequestID: requestID}
 		var reply PutReply
 		ok := call(primary, "KVServer.Put", &args, &reply)
-		//fmt.Println("PutAux: ", ok)
 		if ok && reply.Err == OK {
 			return reply.PreviousValue
 		}
