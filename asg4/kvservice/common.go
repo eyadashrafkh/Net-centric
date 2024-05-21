@@ -10,6 +10,8 @@ const (
 	OK             = "OK"
 	ErrNoKey       = "ErrNoKey"
 	ErrWrongServer = "ErrWrongServer"
+	DataFile	   = "kv_data.json"
+	logFile		   = "kv_log.json"
 )
 
 type Err string
@@ -56,3 +58,12 @@ func nrand() int64 {
 	x := bigx.Int64()
 	return x
 }
+
+type LogEntry struct {
+	// Add your definitions here.
+	Op  string
+	Key string
+	Val string
+	DoHash bool	
+}
+
