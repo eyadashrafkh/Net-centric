@@ -124,6 +124,9 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 
 func (server *KVServer) Get(args *GetArgs, reply *GetReply) error {
 	// Your code here.
+	server.mu.RLock()
+	defer server.mu.RUnlock()
+
 	// Get the value from the key/value database.
 	if args.IsClient {
 		if server.id == server.view.Primary {
