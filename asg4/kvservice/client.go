@@ -1,7 +1,6 @@
 package kvservice
 
 import (
-	"fmt"
 	"log"
 	"net/rpc"
 	"strconv"
@@ -61,7 +60,7 @@ func call(srv string, rpcname string,
 		return true
 	}
 
-	fmt.Println(err)
+	//fmt.Println(err)
 	return false
 }
 
@@ -103,12 +102,13 @@ func (client *KVClient) PutAux(key string, value string, dohash bool) string {
 		return ""
 	}
 	requestID := strconv.FormatInt(nrand(), 10)
-	requestID = client.id + requestID
+	requestID = client.id + "_" + requestID
 	for {
 		primary := client.view.Primary
 		args := PutArgs{Key: key, Value: value, DoHash: dohash, IsClient: true, RequestID: requestID}
 		var reply PutReply
 		ok := call(primary, "KVServer.Put", &args, &reply)
+		//fmt.Println("PutAux: ", ok)
 		if ok && reply.Err == OK {
 			return reply.PreviousValue
 		}

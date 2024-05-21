@@ -48,39 +48,36 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 	server.mu.Lock()
 	defer server.mu.Unlock()
 
-	// Check if the request ID is already stored for the key.
-	if args.RequestID == server.requestID[args.Key] {
-		// If the request ID is already stored for the key, return the previous reply.
-		prevReply := server.reqreply[args.RequestID]
-		//fmt.Println("Previous Reply: ", prevReply)
-		reply = &prevReply
-		return nil
-	}
-
 	if args.IsClient {
+		// Check if the request ID is already stored for the key.
+		if args.RequestID == server.requestID[args.Key] {
+			// If the request ID is already stored for the key, return the previous reply.
+			prevReply := server.reqreply[args.RequestID]
+			//fmt.Println("Previous Reply: ", prevReply)
+			reply.Err = prevReply.Err
+			reply.PreviousValue = prevReply.PreviousValue
+			return nil
+		}
 		if server.id == server.view.Primary {
 			if args.DoHash {
 				// If the PutArgs has DoHash set to true, hash the value before storing it.
 				previousValue, ok := server.data[args.Key]
-				//fmt.Println("Previous Value: ", previousValue)
-				hashedValue := hash(args.Value + previousValue)
-				//fmt.Println("Hashed Value: ", hashedValue)
+				hashedValue := hash(previousValue + args.Value)
+				reply.Err = OK
 				if ok {
-					reply.Err = OK
 					reply.PreviousValue = previousValue
-					// Store the request ID for the key.
-					server.requestID[args.Key] = args.RequestID
-					// Store the reply for the request ID.
-					server.reqreply[args.RequestID] = *reply
 				} else {
-					reply.Err = ErrNoKey
 					reply.PreviousValue = ""
 				}
 				val := fmt.Sprintf("%v", hashedValue)
 				server.data[args.Key] = val
-				call_args := &PutArgs{args.Key, val, false, false, args.RequestID}
-				call_reply := &PutReply{}
+				// Store the request ID for the key.
+				server.requestID[args.Key] = args.RequestID
+				// Store the reply for the request ID.
+				server.reqreply[args.RequestID] = *reply
 				if server.hasBackup {
+					call_args := &PutArgs{args.Key, val, false, false, args.RequestID}
+					call_reply := &PutReply{}
 					err := call(server.backup, "KVServer.Put", call_args, call_reply)
 					if err != true {
 						return nil
@@ -89,21 +86,21 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 			} else {
 				// If the PutArgs has DoHash set to false, store the value as is.
 				previousValue, ok := server.data[args.Key]
+				reply.Err = OK
 				if ok {
-					reply.Err = OK
 					reply.PreviousValue = previousValue
-					// Store the request ID for the key.
-					server.requestID[args.Key] = args.RequestID
-					// Store the reply for the request ID.
-					server.reqreply[args.RequestID] = *reply
 				} else {
-					reply.Err = ErrNoKey
 					reply.PreviousValue = ""
 				}
 				server.data[args.Key] = args.Value
-				call_args := &PutArgs{args.Key, args.Value, false, false, args.RequestID}
-				call_reply := &PutReply{}
+				// Store the request ID for the key.
+				server.requestID[args.Key] = args.RequestID
+				// Store the reply for the request ID.
+				server.reqreply[args.RequestID] = *reply
+				// Forward the data to the backup if it exists.
 				if server.hasBackup {
+					call_args := &PutArgs{args.Key, args.Value, false, false, args.RequestID}
+					call_reply := &PutReply{}
 					err := call(server.backup, "KVServer.Put", call_args, call_reply)
 					if err != true {
 						return nil
@@ -119,33 +116,31 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 		if args.DoHash {
 			previousValue, ok := server.data[args.Key]
 			hashedValue := hash(args.Value + previousValue)
+			reply.Err = OK
 			if ok {
-				reply.Err = OK
 				reply.PreviousValue = previousValue
-				// Store the request ID for the key.
-				server.requestID[args.Key] = args.RequestID
-				// Store the reply for the request ID.
-				server.reqreply[args.RequestID] = *reply
 			} else {
-				reply.Err = ErrNoKey
 				reply.PreviousValue = ""
 			}
 			val := fmt.Sprintf("%v", hashedValue)
+			// Store the request ID for the key.
+			server.requestID[args.Key] = args.RequestID
+			// Store the reply for the request ID.
+			server.reqreply[args.RequestID] = *reply
 			server.data[args.Key] = val
 		} else {
 			previousValue, ok := server.data[args.Key]
+			reply.Err = OK
 			if ok {
-				reply.Err = OK
 				reply.PreviousValue = previousValue
-				// Store the request ID for the key.
-				server.requestID[args.Key] = args.RequestID
-				// Store the reply for the request ID.
-				server.reqreply[args.RequestID] = *reply
 			} else {
-				reply.Err = ErrNoKey
 				reply.PreviousValue = ""
 			}
 			server.data[args.Key] = args.Value
+			// Store the request ID for the key.
+			server.requestID[args.Key] = args.RequestID
+			// Store the reply for the request ID.
+			server.reqreply[args.RequestID] = *reply
 		}
 	}
 
