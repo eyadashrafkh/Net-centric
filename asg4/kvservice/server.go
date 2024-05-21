@@ -23,13 +23,6 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
 	return
 }
 
-// Add new Struct
-type clientRequest struct {
-	data 		string
-	reply 		PutReply
-	requestID 	string
-}
-
 type KVServer struct {
 	l           net.Listener
 	dead        bool // for testing
@@ -43,8 +36,8 @@ type KVServer struct {
 	// Add your declarations here.
 	backup    string
 	hasBackup bool
+	data      map[string]string
 	mu        sync.RWMutex
-	data      map[string]clientRequest
 }
 
 func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
@@ -53,21 +46,12 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 	server.mu.Lock()
 	defer server.mu.Unlock()
 
-	// Check if this request has already been processed
-	if cachedReply, ok := server.data[args.Key]; ok {
-		*reply = cachedReply.reply
-		return nil
-	}
-
 	if args.IsClient {
 		if server.id == server.view.Primary {
 			if args.DoHash {
 				// If the PutArgs has DoHash set to true, hash the value before storing it.
-				previousRequest, ok := server.data[args.Key]
-				previousValue := previousRequest.data
-				fmt.Println("Previous Value in primary: ", previousValue)
+				previousValue, ok := server.data[args.Key]
 				hashedValue := hash(args.Value + previousValue)
-				fmt.Println("Hashed Value in primary: ", hashedValue)
 				if ok {
 					reply.Err = OK
 					reply.PreviousValue = previousValue
@@ -76,24 +60,18 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 					reply.PreviousValue = ""
 				}
 				val := fmt.Sprintf("%v", hashedValue)
-				request := clientRequest{
-					data:      val,
-					reply:     *reply,
-					requestID: args.RequestID,
-				}
-				server.data[args.Key] = request
+				server.data[args.Key] = val
 				args := &PutArgs{args.Key, val, false, false, args.RequestID}
-				call_reply := &PutReply{}
+				reply := &PutReply{}
 				if server.hasBackup {
-					err := call(server.backup, "KVServer.Put", args, call_reply)
+					err := call(server.backup, "KVServer.Put", args, reply)
 					if err != true {
 						return nil
 					}
 				}
 			} else {
 				// If the PutArgs has DoHash set to false, store the value as is.
-				previousRequest, ok := server.data[args.Key]
-				previousValue := previousRequest.data
+				previousValue, ok := server.data[args.Key]
 				if ok {
 					reply.Err = OK
 					reply.PreviousValue = previousValue
@@ -101,16 +79,11 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 					reply.Err = ErrNoKey
 					reply.PreviousValue = ""
 				}
-				request := clientRequest{
-					data:      args.Value,
-					reply:     *reply,
-					requestID: args.RequestID,
-				}
-				server.data[args.Key] = request
+				server.data[args.Key] = args.Value
 				args := &PutArgs{args.Key, args.Value, false, false, args.RequestID}
-				call_reply := &PutReply{}
+				reply := &PutReply{}
 				if server.hasBackup {
-					err := call(server.backup, "KVServer.Put", args, call_reply)
+					err := call(server.backup, "KVServer.Put", args, reply)
 					if err != true {
 						return nil
 					}
@@ -123,8 +96,7 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 	} else {
 		// If the PutArgs is not from a client, store the value as is.
 		if args.DoHash {
-			previousRequest, ok := server.data[args.Key]
-			previousValue := previousRequest.data
+			previousValue, ok := server.data[args.Key]
 			hashedValue := hash(args.Value + previousValue)
 			if ok {
 				reply.Err = OK
@@ -134,16 +106,9 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 				reply.PreviousValue = ""
 			}
 			val := fmt.Sprintf("%v", hashedValue)
-			request := clientRequest{
-				data:      val,
-				reply:     *reply,
-				requestID: args.RequestID,
-			}
-			server.data[args.Key] = request
-
+			server.data[args.Key] = val
 		} else {
-			previousRequest, ok := server.data[args.Key]
-			previousValue := previousRequest.data
+			previousValue, ok := server.data[args.Key]
 			if ok {
 				reply.Err = OK
 				reply.PreviousValue = previousValue
@@ -151,15 +116,9 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 				reply.Err = ErrNoKey
 				reply.PreviousValue = ""
 			}
-			request := clientRequest{
-				data:      args.Value,
-				reply:     *reply,
-				requestID: args.RequestID,
-			}
-			server.data[args.Key] = request
+			server.data[args.Key] = args.Value
 		}
 	}
-
 	return nil
 }
 
@@ -172,10 +131,9 @@ func (server *KVServer) Get(args *GetArgs, reply *GetReply) error {
 	if args.IsClient {
 		if server.id == server.view.Primary {
 			value, ok := server.data[args.Key]
-			val := value.data
 			if ok {
 				reply.Err = OK
-				reply.Value = val
+				reply.Value = value
 			} else {
 				reply.Err = ErrNoKey
 				reply.Value = ""
@@ -187,10 +145,9 @@ func (server *KVServer) Get(args *GetArgs, reply *GetReply) error {
 	} else {
 		// If the GetArgs is not from a client, return the value as is.
 		value, ok := server.data[args.Key]
-		val := value.data
 		if ok {
 			reply.Err = OK
-			reply.Value = val
+			reply.Value = value
 		} else {
 			reply.Err = ErrNoKey
 			reply.Value = ""
@@ -219,9 +176,7 @@ func (server *KVServer) tick() {
 				server.hasBackup = true
 				// Forward data to the new backup.
 				for key, value := range server.data {
-					data :=value.data
-					reqID := value.requestID
-					args := &PutArgs{key, data, false, false, reqID}
+					args := &PutArgs{key, value, false, false}
 					reply := &PutReply{}
 					err := call(server.backup, "KVServer.Put", args, reply)
 					if err != true {
@@ -234,6 +189,13 @@ func (server *KVServer) tick() {
 			server.hasBackup = false
 			server.backup = ""
 		}
+
+	} else if server.id == server.view.Backup {
+		//log.Printf("KVServer(%v) is the Backup\n", server.id)
+		// Perform backup-specific tasks if any (e.g., ready to accept data from the primary).
+	} else {
+		//log.Printf("KVServer(%v) is neither Primary nor Backup\n", server.id)
+		// Perform tasks for servers that are neither primary nor backup.
 	}
 }
 
@@ -255,7 +217,7 @@ func StartKVServer(monitorServer string, id string) *KVServer {
 	// ==================================
 	server.backup = ""
 	server.hasBackup = false
-	server.data = make(map[string]clientRequest)
+	server.data = make(map[string]string)
 	//====================================
 
 	rpcs := rpc.NewServer()
