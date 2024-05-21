@@ -48,6 +48,14 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 	server.mu.Lock()
 	defer server.mu.Unlock()
 
+	// Check if the request ID is already stored for the key.
+	if args.RequestID == server.requestID[args.Key] {
+		// If the request ID is already stored for the key, return the previous reply.
+		prevReply := server.reqreply[args.RequestID]
+		reply = &prevReply
+		return nil
+	}
+
 	if args.IsClient {
 		if server.id == server.view.Primary {
 			if args.DoHash {
@@ -121,6 +129,11 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 			server.data[args.Key] = args.Value
 		}
 	}
+	// Store the request ID for the key.
+	server.requestID[args.Key] = args.RequestID
+	// Store the reply for the request ID.
+	server.reqreply[args.RequestID] = *reply
+
 	return nil
 }
 
