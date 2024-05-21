@@ -1,7 +1,6 @@
 package kvservice
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
@@ -12,7 +11,6 @@ import (
 	"syscall"
 	"sysmonitor"
 	"time"
-	"io/ioutil"
 )
 
 // Debugging
@@ -40,83 +38,8 @@ type KVServer struct {
 	hasBackup bool
 	data      map[string]string
 	mu        sync.RWMutex
-	log 	  []LogEntry
 }
 
-func (server *KVServer) GetLog() []LogEntry {
-	return server.log
-}
-
-func (server *KVServer) persistState()  {
-	server.mu.RLock()
-	defer server.mu.RUnlock()
-
-	// Persist the server's state to disk.
-	data, err := json.Marshal(server.data)
-	if err != nil {
-		log.Printf("Error: %v\n", err)
-	}
-
-	logData, err := json.Marshal(server.log)
-	if err != nil {
-		log.Printf("Error: %v\n", err)
-	}
-
-	err = ioutil.WriteFile(DataFile, data, 0644)
-	if err != nil {
-		log.Printf("Error: %v\n", err)
-	}
-
-	err = ioutil.WriteFile(logFile, logData, 0644)
-	if err != nil {
-		log.Printf("Error: %v\n", err)
-	}
-}
-
-func (server *KVServer) recoverState() {
-	// Recover the server's state from disk.
-	server.mu.Lock()
-	defer server.mu.Unlock()
-
-	data, err := ioutil.ReadFile(DataFile)
-	if err != nil {
-		err = json.Unmarshal(data, &server.data)
-		if err != nil {
-			log.Printf("Error: %v\n", err)
-		}
-	}
-	
-	logData, err := ioutil.ReadFile(logFile)
-	if err != nil {
-		err = json.Unmarshal(logData, &server.log)
-		if err != nil {
-			log.Printf("Error: %v\n", err)
-		}
-	}
-}
-
-func (server *KVServer) appendLog(entry LogEntry) {
-	server.mu.Lock()
-	defer server.mu.Unlock()
-
-	server.log = append(server.log, entry)
-	server.persistState()
-}
-
-func (server *KVServer) applyLog(entry LogEntry) {
-	server.mu.Lock()
-	defer server.mu.Unlock()
-
-	if entry.DoHash {
-		previousValue, _ := server.data[entry.Key]
-		hashedValue := hash(entry.Val + previousValue)
-		val := fmt.Sprintf("%v", hashedValue)
-		server.data[entry.Key] = val
-	} else {
-		server.data[entry.Key] = entry.Val
-	}
-	server.persistState()
-}
 
 func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 	// Your code here.
@@ -139,8 +62,6 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 				}
 				val := fmt.Sprintf("%v", hashedValue)
 				server.data[args.Key] = val
-				entry := LogEntry{"Put", args.Key, val, args.DoHash}
-				server.appendLog(entry)
 				args := &PutArgs{args.Key, val, false, false}
 				reply := &PutReply{}
 				if server.hasBackup {
@@ -160,8 +81,6 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 					reply.PreviousValue = ""
 				}
 				server.data[args.Key] = args.Value
-				entry := LogEntry{"Put", args.Key, args.Value, args.DoHash}
-				server.appendLog(entry)
 				args := &PutArgs{args.Key, args.Value, false, false}
 				reply := &PutReply{}
 				if server.hasBackup {
@@ -201,7 +120,6 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 			server.data[args.Key] = args.Value
 		}
 	}
-	server.persistState()
 	return nil
 }
 
@@ -294,8 +212,6 @@ func StartKVServer(monitorServer string, id string) *KVServer {
 	server.backup = ""
 	server.hasBackup = false
 	server.data = make(map[string]string)
-	server.log = make([]LogEntry, 0)
-	server.recoverState()
 	//====================================
 
 	rpcs := rpc.NewServer()
