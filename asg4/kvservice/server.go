@@ -34,17 +34,24 @@ type KVServer struct {
 	finish      chan interface{}
 
 	// Add your declarations here.
-	backup    string
-	hasBackup bool
-	data      map[string]string
-	requestID map[string]string
-	reqreply  map[string]PutReply
-	mu        sync.RWMutex
+	hasBackup bool // Indicates if the server has a backup.
+	backup    string // The backup server's ID.
+	data      map[string]string // The key/value database.
+	requestID map[string]string // The request ID for each key.
+	reqreply  map[string]PutReply // The reply for each request ID.
+	mu        sync.RWMutex // Mutex for the key/value database.
+}
+
+// Store the key/value pair in the Request database.
+func (server *KVServer) updateRequest(args *PutArgs, reply *PutReply) {
+	// Store the request ID for the key.
+	server.requestID[args.Key] = args.RequestID
+	// Store the reply for the request ID.
+	server.reqreply[args.RequestID] = *reply
 }
 
 func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 	// Your code here.
-	// Put the value into the key/value database.
 	server.mu.Lock()
 	defer server.mu.Unlock()
 
@@ -62,7 +69,7 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 		if server.id == server.view.Primary {
 			if args.DoHash {
 				// If the PutArgs has DoHash set to true, hash the value before storing it.
-				previousValue, ok := server.data[args.Key]
+				previousValue, ok := server.data[args.Key] 
 				hashedValue := hash(previousValue + args.Value)
 				reply.Err = OK
 				if ok {
@@ -72,10 +79,7 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 				}
 				val := fmt.Sprintf("%v", hashedValue)
 				server.data[args.Key] = val
-				// Store the request ID for the key.
-				server.requestID[args.Key] = args.RequestID
-				// Store the reply for the request ID.
-				server.reqreply[args.RequestID] = *reply
+				server.updateRequest(args, reply)
 				if server.hasBackup {
 					call_args := &PutArgs{args.Key, val, false, false, args.RequestID}
 					call_reply := &PutReply{}
@@ -94,10 +98,7 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 					reply.PreviousValue = ""
 				}
 				server.data[args.Key] = args.Value
-				// Store the request ID for the key.
-				server.requestID[args.Key] = args.RequestID
-				// Store the reply for the request ID.
-				server.reqreply[args.RequestID] = *reply
+				server.updateRequest(args, reply)
 				// Forward the data to the backup if it exists.
 				if server.hasBackup {
 					call_args := &PutArgs{args.Key, args.Value, false, false, args.RequestID}
@@ -124,10 +125,7 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 				reply.PreviousValue = ""
 			}
 			val := fmt.Sprintf("%v", hashedValue)
-			// Store the request ID for the key.
-			server.requestID[args.Key] = args.RequestID
-			// Store the reply for the request ID.
-			server.reqreply[args.RequestID] = *reply
+			server.updateRequest(args, reply)
 			server.data[args.Key] = val
 		} else {
 			previousValue, ok := server.data[args.Key]
@@ -138,10 +136,7 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 				reply.PreviousValue = ""
 			}
 			server.data[args.Key] = args.Value
-			// Store the request ID for the key.
-			server.requestID[args.Key] = args.RequestID
-			// Store the reply for the request ID.
-			server.reqreply[args.RequestID] = *reply
+			server.updateRequest(args, reply)
 		}
 	}
 
