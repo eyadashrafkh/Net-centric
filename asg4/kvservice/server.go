@@ -37,6 +37,8 @@ type KVServer struct {
 	backup    string
 	hasBackup bool
 	data      map[string]string
+	requestID map[string]string
+	reqreply  map[string]PutReply
 	mu        sync.RWMutex
 }
 
@@ -61,10 +63,10 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 				}
 				val := fmt.Sprintf("%v", hashedValue)
 				server.data[args.Key] = val
-				args := &PutArgs{args.Key, val, false, false}
-				reply := &PutReply{}
+				call_args := &PutArgs{args.Key, val, false, false, args.RequestID}
+				call_reply := &PutReply{}
 				if server.hasBackup {
-					err := call(server.backup, "KVServer.Put", args, reply)
+					err := call(server.backup, "KVServer.Put", call_args, call_reply)
 					if err != true {
 						return nil
 					}
@@ -80,10 +82,10 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 					reply.PreviousValue = ""
 				}
 				server.data[args.Key] = args.Value
-				args := &PutArgs{args.Key, args.Value, false, false}
-				reply := &PutReply{}
+				call_args := &PutArgs{args.Key, args.Value, false, false, args.RequestID}
+				call_reply := &PutReply{}
 				if server.hasBackup {
-					err := call(server.backup, "KVServer.Put", args, reply)
+					err := call(server.backup, "KVServer.Put", call_args, call_reply)
 					if err != true {
 						return nil
 					}
@@ -176,7 +178,8 @@ func (server *KVServer) tick() {
 				server.hasBackup = true
 				// Forward data to the new backup.
 				for key, value := range server.data {
-					args := &PutArgs{key, value, false, false}
+					reqID := server.requestID[key]
+					args := &PutArgs{key, value, false, false, reqID}
 					reply := &PutReply{}
 					err := call(server.backup, "KVServer.Put", args, reply)
 					if err != true {
@@ -189,13 +192,6 @@ func (server *KVServer) tick() {
 			server.hasBackup = false
 			server.backup = ""
 		}
-
-	} else if server.id == server.view.Backup {
-		//log.Printf("KVServer(%v) is the Backup\n", server.id)
-		// Perform backup-specific tasks if any (e.g., ready to accept data from the primary).
-	} else {
-		//log.Printf("KVServer(%v) is neither Primary nor Backup\n", server.id)
-		// Perform tasks for servers that are neither primary nor backup.
 	}
 }
 
@@ -218,6 +214,8 @@ func StartKVServer(monitorServer string, id string) *KVServer {
 	server.backup = ""
 	server.hasBackup = false
 	server.data = make(map[string]string)
+	server.requestID = make(map[string]string)
+	server.reqreply = make(map[string]PutReply)
 	//====================================
 
 	rpcs := rpc.NewServer()
