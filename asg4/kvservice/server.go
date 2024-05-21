@@ -40,7 +40,6 @@ type KVServer struct {
 	mu        sync.RWMutex
 }
 
-
 func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 	// Your code here.
 	// Put the value into the key/value database.
@@ -52,7 +51,9 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 			if args.DoHash {
 				// If the PutArgs has DoHash set to true, hash the value before storing it.
 				previousValue, ok := server.data[args.Key]
+				fmt.Println("Previous Value in primary: ", previousValue)
 				hashedValue := hash(args.Value + previousValue)
+				fmt.Println("Hashed Value in primary: ", hashedValue)
 				if ok {
 					reply.Err = OK
 					reply.PreviousValue = previousValue
@@ -63,9 +64,9 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 				val := fmt.Sprintf("%v", hashedValue)
 				server.data[args.Key] = val
 				args := &PutArgs{args.Key, val, false, false}
-				reply := &PutReply{}
+				call_reply := &PutReply{}
 				if server.hasBackup {
-					err := call(server.backup, "KVServer.Put", args, reply)
+					err := call(server.backup, "KVServer.Put", args, call_reply)
 					if err != true {
 						return nil
 					}
@@ -82,9 +83,9 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 				}
 				server.data[args.Key] = args.Value
 				args := &PutArgs{args.Key, args.Value, false, false}
-				reply := &PutReply{}
+				call_reply := &PutReply{}
 				if server.hasBackup {
-					err := call(server.backup, "KVServer.Put", args, reply)
+					err := call(server.backup, "KVServer.Put", args, call_reply)
 					if err != true {
 						return nil
 					}
