@@ -6,7 +6,6 @@ import (
 	"net/rpc"
 	"strconv"
 	"sysmonitor"
-	"time"
 )
 
 // import "time"
@@ -106,7 +105,6 @@ func (client *KVClient) PutAux(key string, value string, dohash bool) string {
 	requestID := strconv.FormatInt(nrand(), 10)
 	requestID = client.id + requestID
 	for {
-		fmt.Println("RequestID: ", requestID)
 		primary := client.view.Primary
 		args := PutArgs{Key: key, Value: value, DoHash: dohash, IsClient: true, RequestID: requestID}
 		var reply PutReply
@@ -114,7 +112,6 @@ func (client *KVClient) PutAux(key string, value string, dohash bool) string {
 		if ok && reply.Err == OK {
 			return reply.PreviousValue
 		}
-		time.Sleep(100 * time.Millisecond)
 		client.updateView()
 	}
 }

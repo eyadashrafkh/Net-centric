@@ -2,7 +2,10 @@ package kvservice
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"math/rand"
+	"net"
 	"os"
 	"runtime"
 	"strconv"
@@ -203,7 +206,7 @@ func TestAtMostOnce(t *testing.T) {
 }
 
 // Put right after a backup dies.
-/*
+
 func TestFailPut(t *testing.T) {
 	runtime.GOMAXPROCS(4)
 
@@ -958,4 +961,3 @@ func TestPartition2(t *testing.T) {
 	s3.Kill()
 	vs.Kill()
 }
-*/
