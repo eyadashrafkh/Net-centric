@@ -187,15 +187,14 @@ func (server *KVServer) tick() {
 	server.mu.Lock()
 	defer server.mu.Unlock()
 	// This line will give an error initially as view and err are not used.
-	view := ;
 	for {
 		view, err := server.monitorClnt.Ping(server.view.Viewnum)
 		if err == nil {
+			server.view = view
 			break
 		}
 		time.Sleep(time.Second) // Add a delay before retrying
 	}
-	server.view = view
 	// Determine the server's role based on the view.
 	if server.id == server.view.Primary {
 		// If the server is the primary and detects a new backup, handle the data forwarding.
