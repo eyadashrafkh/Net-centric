@@ -106,6 +106,7 @@ func (client *KVClient) PutAux(key string, value string, dohash bool) string {
 	requestID := strconv.FormatInt(nrand(), 10)
 	requestID = client.id + requestID
 	for {
+		fmt.Println("RequestID: ", requestID)
 		primary := client.view.Primary
 		args := PutArgs{Key: key, Value: value, DoHash: dohash, IsClient: true, RequestID: requestID}
 		var reply PutReply
