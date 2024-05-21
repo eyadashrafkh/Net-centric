@@ -61,7 +61,9 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 			if args.DoHash {
 				// If the PutArgs has DoHash set to true, hash the value before storing it.
 				previousValue, ok := server.data[args.Key]
+				fmt.Println("Previous Value: ", previousValue)
 				hashedValue := hash(args.Value + previousValue)
+				fmt.Println("Hashed Value: ", hashedValue)
 				if ok {
 					reply.Err = OK
 					reply.PreviousValue = previousValue
