@@ -81,6 +81,7 @@ func (client *KVClient) Get(key string) string {
 		return ""
 	}
 	for {
+		client.updateView()
 		primary := client.view.Primary
 		args := GetArgs{Key: key, IsClient: true}
 		var reply GetReply
@@ -88,7 +89,6 @@ func (client *KVClient) Get(key string) string {
 		if ok && reply.Err == OK {
 			return reply.Value
 		}
-		client.updateView()
 	}
 }
 
