@@ -102,10 +102,10 @@ func (client *KVClient) PutAux(key string, value string, dohash bool) string {
 		log.Printf("PutAux: key is empty\n")
 		return ""
 	}
+	requestID := strconv.FormatInt(nrand(), 10)
+	requestID = client.id + requestID
 	for {
 		primary := client.view.Primary
-		requestID := strconv.FormatInt(nrand(), 10)
-		requestID = client.id + requestID
 		args := PutArgs{Key: key, Value: value, DoHash: dohash, IsClient: true, RequestID: requestID}
 		var reply PutReply
 		ok := call(primary, "KVServer.Put", &args, &reply)

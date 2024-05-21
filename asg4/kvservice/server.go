@@ -52,6 +52,7 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 	if args.RequestID == server.requestID[args.Key] {
 		// If the request ID is already stored for the key, return the previous reply.
 		prevReply := server.reqreply[args.RequestID]
+		fmt.Println("Previous Reply: ", prevReply)
 		reply = &prevReply
 		return nil
 	}
@@ -67,6 +68,10 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 				if ok {
 					reply.Err = OK
 					reply.PreviousValue = previousValue
+					// Store the request ID for the key.
+					server.requestID[args.Key] = args.RequestID
+					// Store the reply for the request ID.
+					server.reqreply[args.RequestID] = *reply
 				} else {
 					reply.Err = ErrNoKey
 					reply.PreviousValue = ""
@@ -87,6 +92,10 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 				if ok {
 					reply.Err = OK
 					reply.PreviousValue = previousValue
+					// Store the request ID for the key.
+					server.requestID[args.Key] = args.RequestID
+					// Store the reply for the request ID.
+					server.reqreply[args.RequestID] = *reply
 				} else {
 					reply.Err = ErrNoKey
 					reply.PreviousValue = ""
@@ -113,6 +122,10 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 			if ok {
 				reply.Err = OK
 				reply.PreviousValue = previousValue
+				// Store the request ID for the key.
+				server.requestID[args.Key] = args.RequestID
+				// Store the reply for the request ID.
+				server.reqreply[args.RequestID] = *reply
 			} else {
 				reply.Err = ErrNoKey
 				reply.PreviousValue = ""
@@ -124,6 +137,10 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 			if ok {
 				reply.Err = OK
 				reply.PreviousValue = previousValue
+				// Store the request ID for the key.
+				server.requestID[args.Key] = args.RequestID
+				// Store the reply for the request ID.
+				server.reqreply[args.RequestID] = *reply
 			} else {
 				reply.Err = ErrNoKey
 				reply.PreviousValue = ""
@@ -131,10 +148,6 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 			server.data[args.Key] = args.Value
 		}
 	}
-	// Store the request ID for the key.
-	server.requestID[args.Key] = args.RequestID
-	// Store the reply for the request ID.
-	server.reqreply[args.RequestID] = *reply
 
 	return nil
 }
