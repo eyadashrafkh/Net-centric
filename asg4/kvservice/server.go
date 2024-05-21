@@ -34,24 +34,17 @@ type KVServer struct {
 	finish      chan interface{}
 
 	// Add your declarations here.
-	hasBackup bool // Indicates if the server has a backup.
-	backup    string // The backup server's ID.
-	data      map[string]string // The key/value database.
-	requestID map[string]string // The request ID for each key.
-	reqreply  map[string]PutReply // The reply for each request ID.
-	mu        sync.RWMutex // Mutex for the key/value database.
-}
-
-// Store the key/value pair in the Request database.
-func (server *KVServer) updateRequest(args *PutArgs, reply *PutReply) {
-	// Store the request ID for the key.
-	server.requestID[args.Key] = args.RequestID
-	// Store the reply for the request ID.
-	server.reqreply[args.RequestID] = *reply
+	backup    string
+	hasBackup bool
+	data      map[string]string
+	requestID map[string]string
+	reqreply  map[string]PutReply
+	mu        sync.RWMutex
 }
 
 func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 	// Your code here.
+	// Put the value into the key/value database.
 	server.mu.Lock()
 	defer server.mu.Unlock()
 
@@ -64,12 +57,12 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 		reply.PreviousValue = prevReply.PreviousValue
 		return nil
 	}
-
+	
 	if args.IsClient {
 		if server.id == server.view.Primary {
 			if args.DoHash {
 				// If the PutArgs has DoHash set to true, hash the value before storing it.
-				previousValue, ok := server.data[args.Key] 
+				previousValue, ok := server.data[args.Key]
 				hashedValue := hash(previousValue + args.Value)
 				reply.Err = OK
 				if ok {
@@ -79,7 +72,10 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 				}
 				val := fmt.Sprintf("%v", hashedValue)
 				server.data[args.Key] = val
-				server.updateRequest(args, reply)
+				// Store the request ID for the key.
+				server.requestID[args.Key] = args.RequestID
+				// Store the reply for the request ID.
+				server.reqreply[args.RequestID] = *reply
 				if server.hasBackup {
 					call_args := &PutArgs{args.Key, val, false, false, args.RequestID}
 					call_reply := &PutReply{}
@@ -98,7 +94,10 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 					reply.PreviousValue = ""
 				}
 				server.data[args.Key] = args.Value
-				server.updateRequest(args, reply)
+				// Store the request ID for the key.
+				server.requestID[args.Key] = args.RequestID
+				// Store the reply for the request ID.
+				server.reqreply[args.RequestID] = *reply
 				// Forward the data to the backup if it exists.
 				if server.hasBackup {
 					call_args := &PutArgs{args.Key, args.Value, false, false, args.RequestID}
@@ -117,7 +116,7 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 		// If the PutArgs is not from a client, store the value as is.
 		if args.DoHash {
 			previousValue, ok := server.data[args.Key]
-			hashedValue := hash(previousValue + args.Value)
+			hashedValue := hash(args.Value + previousValue)
 			reply.Err = OK
 			if ok {
 				reply.PreviousValue = previousValue
@@ -125,7 +124,10 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 				reply.PreviousValue = ""
 			}
 			val := fmt.Sprintf("%v", hashedValue)
-			server.updateRequest(args, reply)
+			// Store the request ID for the key.
+			server.requestID[args.Key] = args.RequestID
+			// Store the reply for the request ID.
+			server.reqreply[args.RequestID] = *reply
 			server.data[args.Key] = val
 		} else {
 			previousValue, ok := server.data[args.Key]
@@ -136,7 +138,10 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 				reply.PreviousValue = ""
 			}
 			server.data[args.Key] = args.Value
-			server.updateRequest(args, reply)
+			// Store the request ID for the key.
+			server.requestID[args.Key] = args.RequestID
+			// Store the reply for the request ID.
+			server.reqreply[args.RequestID] = *reply
 		}
 	}
 
@@ -179,17 +184,13 @@ func (server *KVServer) Get(args *GetArgs, reply *GetReply) error {
 
 // ping the viewserver periodically.
 func (server *KVServer) tick() {
-	server.mu.Lock()
-	defer server.mu.Unlock()
 	// This line will give an error initially as view and err are not used.
-	for {
-		view, err := server.monitorClnt.Ping(server.view.Viewnum)
-		if err == nil {
-			server.view = view
-			break
-		}
-		time.Sleep(time.Second) // Add a delay before retrying
+	view, err := server.monitorClnt.Ping(server.view.Viewnum)
+	if err != nil {
+		return
 	}
+	// Your code here.
+	server.view = view
 	// Determine the server's role based on the view.
 	if server.id == server.view.Primary {
 		// If the server is the primary and detects a new backup, handle the data forwarding.
