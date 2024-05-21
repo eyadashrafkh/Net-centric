@@ -63,11 +63,9 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 		if server.id == server.view.Primary {
 			if args.DoHash {
 				// If the PutArgs has DoHash set to true, hash the value before storing it.
-				previousRequest, ok := server.data[args.Key]
-				previousValue := previousRequest.data
+				previousValue, ok := server.data[args.Key]
 				fmt.Println("Previous Value in primary: ", previousValue)
 				hashedValue := hash(args.Value + previousValue)
-				fmt.Println("Hashed Value in primary: ", hashedValue)
 				if ok {
 					reply.Err = OK
 					reply.PreviousValue = previousValue
@@ -76,16 +74,11 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 					reply.PreviousValue = ""
 				}
 				val := fmt.Sprintf("%v", hashedValue)
-				request := clientRequest{
-					data:      val,
-					reply:     *reply,
-					requestID: args.RequestID,
-				}
-				server.data[args.Key] = request
-				args := &PutArgs{args.Key, val, false, false, args.RequestID}
+				server.data[args.Key] = val
+				args := &PutArgs{args.Key, val, false, false}
 				call_reply := &PutReply{}
 				if server.hasBackup {
-					err := call(server.backup, "KVServer.Put", args, call_reply)
+					err := call(server.backup, "KVServer.Put", args, reply)
 					if err != true {
 						return nil
 					}
@@ -101,16 +94,11 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 					reply.Err = ErrNoKey
 					reply.PreviousValue = ""
 				}
-				request := clientRequest{
-					data:      args.Value,
-					reply:     *reply,
-					requestID: args.RequestID,
-				}
-				server.data[args.Key] = request
-				args := &PutArgs{args.Key, args.Value, false, false, args.RequestID}
+				server.data[args.Key] = args.Value
+				args := &PutArgs{args.Key, args.Value, false, false}
 				call_reply := &PutReply{}
 				if server.hasBackup {
-					err := call(server.backup, "KVServer.Put", args, call_reply)
+					err := call(server.backup, "KVServer.Put", args, reply)
 					if err != true {
 						return nil
 					}
@@ -234,6 +222,13 @@ func (server *KVServer) tick() {
 			server.hasBackup = false
 			server.backup = ""
 		}
+
+	} else if server.id == server.view.Backup {
+		//log.Printf("KVServer(%v) is the Backup\n", server.id)
+		// Perform backup-specific tasks if any (e.g., ready to accept data from the primary).
+	} else {
+		//log.Printf("KVServer(%v) is neither Primary nor Backup\n", server.id)
+		// Perform tasks for servers that are neither primary nor backup.
 	}
 }
 
