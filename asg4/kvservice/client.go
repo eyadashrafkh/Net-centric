@@ -6,6 +6,7 @@ import (
 	"net/rpc"
 	"strconv"
 	"sysmonitor"
+	"time"
 )
 
 // import "time"
@@ -112,6 +113,7 @@ func (client *KVClient) PutAux(key string, value string, dohash bool) string {
 		if ok && reply.Err == OK {
 			return reply.PreviousValue
 		}
+		time.Sleep(100 * time.Millisecond)
 		client.updateView()
 	}
 }
