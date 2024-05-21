@@ -48,16 +48,17 @@ func (server *KVServer) Put(args *PutArgs, reply *PutReply) error {
 	server.mu.Lock()
 	defer server.mu.Unlock()
 
+	// Check if the request ID is already stored for the key.
+	if args.RequestID == server.requestID[args.Key] {
+		// If the request ID is already stored for the key, return the previous reply.
+		prevReply := server.reqreply[args.RequestID]
+		//fmt.Println("Previous Reply: ", prevReply)
+		reply.Err = prevReply.Err
+		reply.PreviousValue = prevReply.PreviousValue
+		return nil
+	}
+	
 	if args.IsClient {
-		// Check if the request ID is already stored for the key.
-		if args.RequestID == server.requestID[args.Key] {
-			// If the request ID is already stored for the key, return the previous reply.
-			prevReply := server.reqreply[args.RequestID]
-			//fmt.Println("Previous Reply: ", prevReply)
-			reply.Err = prevReply.Err
-			reply.PreviousValue = prevReply.PreviousValue
-			return nil
-		}
 		if server.id == server.view.Primary {
 			if args.DoHash {
 				// If the PutArgs has DoHash set to true, hash the value before storing it.
@@ -214,7 +215,19 @@ func (server *KVServer) tick() {
 			server.hasBackup = false
 			server.backup = ""
 		}
+	} else if server.id == server.view.Backup {
+		// If the server is the backup, reset the backup state.
+		server.hasBackup = false
+		server.backup = ""
+	} else {
+		// If the server is neither the primary nor the backup, reset the backup state.
+		server.hasBackup = false
+		server.backup = ""
+		server.data = make(map[string]string)
+		server.requestID = make(map[string]string)
+		server.reqreply = make(map[string]PutReply)
 	}
+
 }
 
 // tell the server to shut itself down.
