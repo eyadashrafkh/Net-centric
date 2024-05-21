@@ -694,11 +694,11 @@ func TestRepeatedCrashUnreliable(t *testing.T) {
 
 	for i := 0; i < nth; i++ {
 		ok := <-cha[i]
+		fmt.Printf("  ... NIGGAAAA\n")
 		if ok == false {
 			t.Fatal("child failed")
 		}
 	}
-
 	ck := MakeKVClient(vshost)
 	ck.Put("aaa", "bbb")
 	if v := ck.Get("aaa"); v != "bbb" {
