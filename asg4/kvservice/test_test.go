@@ -694,7 +694,6 @@ func TestRepeatedCrashUnreliable(t *testing.T) {
 	for i := 0; i < nth; i++ {
 		ok := <-cha[i]
 		if ok == false {
-			fmt.Printf("  ... NIGGAAAA\n")
 			t.Fatal("child failed")
 		}
 	}
