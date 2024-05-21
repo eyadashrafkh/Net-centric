@@ -20,6 +20,7 @@ type PutArgs struct {
 	DoHash bool // For PutHash
 	// You'll have to add definitions here.
 	IsClient bool
+	RequestID string
 	// Field names should start with capital letters for RPC to work.
 }
 
